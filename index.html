@@ -1,0 +1,4289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>한글 쑥쑥 놀이터 - 어린이 한글 놀이</title>
+
+  <!-- PWA 및 모바일 웹앱 메타 태그 -->
+  <meta name="theme-color" content="#FF8A65" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="한글놀이터" />
+  <meta name="description" content="태블릿과 모바일에서 즐기는 재미있는 어린이 한글 놀이 게임" />
+
+  <!-- 아이콘 및 매니페스트 연동 (깃허브 저장소 루트의 icon.ico, icon.png, manifest.json 참조) -->
+  <link rel="icon" href="./icon.ico" type="image/x-icon" />
+  <link rel="icon" href="./icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="./icon.png" />
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- 귀여운 한글 폰트 (Jua, Noto Sans KR) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* ==========================================================================
+       1. 무스크롤 100dvh 고정 레이아웃 & 터치 최적화
+       ========================================================================== */
+    :root {
+      --app-bg: #FFF9F0;
+      --primary: #FF8A65;
+      --primary-dark: #F4511E;
+      --secondary: #4FC3F7;
+      --accent-yellow: #FFD54F;
+      --accent-green: #81C784;
+      --accent-purple: #BA68C8;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      position: fixed;
+      inset: 0;
+      background-color: var(--app-bg);
+      font-family: 'Jua', 'Noto Sans KR', sans-serif;
+      color: #374151;
+      overscroll-behavior: none;
+    }
+
+    /* 전체 앱 컨테이너: 안전영역(Notch/Home Indicator) 반영 */
+    #app-shell {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding-top: max(0.35rem, var(--safe-top));
+      padding-bottom: max(0.35rem, var(--safe-bottom));
+      padding-left: max(0.45rem, var(--safe-left));
+      padding-right: max(0.45rem, var(--safe-right));
+      overflow: hidden;
+      position: relative;
+      background:
+        radial-gradient(circle at 12% 15%, rgba(255, 213, 79, 0.25) 0%, transparent 28%),
+        radial-gradient(circle at 88% 20%, rgba(79, 195, 247, 0.22) 0%, transparent 30%),
+        radial-gradient(circle at 50% 90%, rgba(255, 138, 101, 0.18) 0%, transparent 35%),
+        #FFF9F0;
+    }
+
+    /* ==========================================================================
+       2. 어린이 친화적 버튼·키패드 입체감 & 애니메이션
+       ========================================================================== */
+    .kid-btn {
+      transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.1s ease;
+    }
+    .kid-btn:active {
+      transform: translateY(3px) scale(0.96);
+    }
+
+    .card-shadow {
+      box-shadow: 0 5px 0 rgba(0, 0, 0, 0.08), 0 8px 18px rgba(0, 0, 0, 0.05);
+    }
+
+    .pill-shadow {
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+    }
+    .pill-shadow:active {
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    /* 실제 두벌식 기계식 키보드 느낌의 입체 키캡 디자인 */
+    .keycap-base {
+      position: relative;
+      border-radius: 0.65rem;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .keycap-base::after {
+      content: '';
+      position: absolute;
+      inset: 2px 3px 4px 3px;
+      border-radius: 0.45rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+    }
+
+    .keycap-consonant {
+      background: linear-gradient(180deg, #F0F9FF 0%, #BAE6FD 100%);
+      border: 2px solid #38BDF8;
+      box-shadow: 0 4px 0 #0284C7, 0 6px 8px rgba(2, 132, 199, 0.22);
+      color: #0369A1;
+    }
+    .keycap-consonant:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #0284C7, 0 2px 4px rgba(2, 132, 199, 0.2);
+    }
+
+    .keycap-vowel {
+      background: linear-gradient(180deg, #FFFBEB 0%, #FDE68A 100%);
+      border: 2px solid #FBBF24;
+      box-shadow: 0 4px 0 #D97706, 0 6px 8px rgba(217, 119, 6, 0.22);
+      color: #B45309;
+    }
+    .keycap-vowel:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #D97706, 0 2px 4px rgba(217, 119, 6, 0.2);
+    }
+
+    .keycap-action {
+      background: linear-gradient(180deg, #FFF1F2 0%, #FECDD3 100%);
+      border: 2px solid #FB7185;
+      box-shadow: 0 4px 0 #E11D48, 0 6px 8px rgba(225, 29, 72, 0.22);
+      color: #BE123C;
+    }
+    .keycap-action:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #E11D48, 0 2px 4px rgba(225, 29, 72, 0.2);
+    }
+
+    .keycap-shift {
+      background: linear-gradient(180deg, #F3E8FF 0%, #DDD6FE 100%);
+      border: 2px solid #A78BFA;
+      box-shadow: 0 4px 0 #7C3AED, 0 6px 8px rgba(124, 58, 237, 0.2);
+      color: #5B21B6;
+    }
+    .keycap-shift:active,
+    .keycap-shift-active {
+      background: linear-gradient(180deg, #8B5CF6 0%, #6D28D9 100%) !important;
+      border: 2px solid #4C1D95 !important;
+      box-shadow: 0 1px 0 #4C1D95, 0 0 12px rgba(139, 92, 246, 0.65) !important;
+      color: #FFFFFF !important;
+      transform: translateY(2px);
+    }
+
+    .keycap-enter {
+      background: linear-gradient(180deg, #DCFCE7 0%, #86EFAC 100%);
+      border: 2px solid #22C55E;
+      box-shadow: 0 4px 0 #15803D, 0 6px 8px rgba(21, 128, 61, 0.22);
+      color: #166534;
+    }
+    .keycap-enter:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #15803D;
+    }
+
+    @keyframes enterPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 0 #15803D, 0 0 0 0 rgba(34, 197, 94, 0.7);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 4px 0 #15803D, 0 0 0 8px rgba(34, 197, 94, 0);
+      }
+    }
+    .keycap-enter-ready {
+      background: linear-gradient(180deg, #22C55E 0%, #16A34A 100%) !important;
+      border: 2px solid #14532D !important;
+      color: #FFFFFF !important;
+      animation: enterPulse 1s infinite;
+      z-index: 10;
+    }
+
+    /* 59열 정밀 스태거드 키보드 그리드 (모든 자음·모음 키 1개 = 정확히 5칸 고정) */
+    .kb-row-grid {
+      display: grid;
+      grid-template-columns: repeat(59, minmax(0, 1fr));
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      70% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px) rotate(-2deg); }
+      40%, 80% { transform: translateX(6px) rotate(2deg); }
+    }
+
+    .animate-pop {
+      animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .animate-float {
+      animation: floatSlow 2.8s ease-in-out infinite;
+    }
+
+    .animate-shake {
+      animation: shakeError 0.38s ease-in-out;
+    }
+
+    /* ==========================================================================
+       3. 화면 크기별 자동 반응형 타이포그래피 & 카드 크기 조절 (clamp)
+       ========================================================================== */
+    .title-text {
+      font-size: clamp(0.95rem, 2.3vmin, 1.4rem);
+    }
+    .tab-text {
+      font-size: clamp(0.68rem, 1.75vmin, 1.05rem);
+    }
+    .emoji-hero {
+      font-size: clamp(2.6rem, 10.5vmin, 5.4rem);
+      line-height: 1.05;
+    }
+    .slot-char {
+      font-size: clamp(1.35rem, 4.8vmin, 2.6rem);
+      width: clamp(2.7rem, 9.5vmin, 4.5rem);
+      height: clamp(2.7rem, 9.5vmin, 4.5rem);
+    }
+    .keycap-text {
+      font-size: clamp(1rem, 3.2vmin, 1.65rem);
+    }
+    .ganada-btn {
+      font-size: clamp(1.15rem, 3.8vmin, 2.1rem);
+    }
+    .quiz-emoji {
+      font-size: clamp(2rem, 8.5vmin, 4.5rem);
+      line-height: 1.1;
+    }
+    .quiz-word {
+      font-size: clamp(1.15rem, 3.6vmin, 2rem);
+    }
+
+    /* 가로 높이가 낮은 스마트폰 가로모드(Landscape) 최적화 */
+    @media (max-height: 500px) {
+      .emoji-hero {
+        font-size: clamp(2rem, 9.5vh, 3.2rem);
+      }
+      .slot-char {
+        width: clamp(2.2rem, 9.5vh, 3.1rem);
+        height: clamp(2.2rem, 9.5vh, 3.1rem);
+        font-size: clamp(1.1rem, 5vh, 1.6rem);
+      }
+      .keycap-text {
+        font-size: clamp(0.85rem, 4vh, 1.25rem);
+      }
+      .compact-hide {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 꽃가루 축하 이펙트 캔버스 -->
+  <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+  <!-- 메인 앱 영역 (100dvh 고정, 스크롤 없음) -->
+  <div id="app-shell" class="max-w-6xl mx-auto">
+
+    <!-- ========================================================================
+         상단 헤더: 로고, 별 스티커, 소리 컨트롤, 앱 설치 버튼, PWA 파일 도우미
+         ======================================================================== -->
+    <header class="flex items-center justify-between gap-1.5 sm:gap-2 px-2 py-1 bg-white/90 backdrop-blur rounded-2xl border-2 border-orange-200 shadow-sm shrink-0">
+      <!-- 앱 아이콘 & 타이틀 -->
+      <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-orange-400 to-amber-300 flex items-center justify-center shadow-inner shrink-0 overflow-hidden border border-orange-300">
+          <img
+            src="./icon.png"
+            alt="아이콘"
+            class="w-full h-full object-cover"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          />
+          <span style="display:none;" class="w-full h-full items-center justify-center text-white text-base sm:text-lg font-bold">가</span>
+        </div>
+        <div class="truncate">
+          <h1 class="title-text font-normal text-orange-600 tracking-wide truncate leading-tight">한글 쑥쑥 놀이터</h1>
+        </div>
+      </div>
+
+      <!-- 우측 상태 및 도구 버튼 그룹 -->
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <!-- 별 스티커 카운터 -->
+        <button
+          id="btn-star-counter"
+          onclick="speakText(`별 스티커를 ${state.stars}개 모았어요!`, false)"
+          class="kid-btn flex items-center gap-1 bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 text-amber-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          title="모은 별 스티커"
+        >
+          <span>⭐</span>
+          <span id="star-count" class="font-bold">0</span>
+        </button>
+
+        <!-- 다시 듣기 버튼 -->
+        <button
+          id="btn-replay-voice"
+          onclick="replayCurrentVoice()"
+          class="kid-btn flex items-center gap-1 bg-sky-100 hover:bg-sky-200 border-2 border-sky-300 text-sky-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          title="다시 듣기"
+        >
+          <span>🔊</span>
+          <span class="hidden sm:inline">다시 듣기</span>
+        </button>
+
+        <!-- 목소리(TTS) 설정 버튼 -->
+        <button
+          id="btn-tts-settings"
+          onclick="openTtsModal()"
+          class="kid-btn flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 border-2 border-indigo-300 text-indigo-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          title="목소리 종류·속도·억양 설정"
+        >
+          <span>🎙️</span>
+          <span class="hidden sm:inline">목소리</span>
+        </button>
+
+        <!-- 음소거 토글 버튼 -->
+        <button
+          id="btn-mute-toggle"
+          onclick="toggleMute()"
+          class="kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm"
+          title="소리 켜기/끄기"
+          aria-label="소리 켜기/끄기"
+        >
+          <span id="mute-icon">🔔</span>
+        </button>
+
+        <!-- 앱 설치 버튼 -->
+        <button
+          id="btn-install-pwa"
+          onclick="handleInstallClick()"
+          class="kid-btn flex items-center gap-1 bg-gradient-to-r from-orange-400 to-rose-400 hover:from-orange-500 hover:to-rose-500 text-white border-2 border-orange-500 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm shadow-sm"
+          title="태블릿/휴대폰에 앱 설치하기"
+        >
+          <span>📲</span>
+          <span>앱 설치</span>
+        </button>
+
+        <!-- 깃허브 배포용 manifest.json / sw.js 다운로드 버튼 -->
+        <button
+          onclick="openPwaModal()"
+          class="kid-btn flex items-center gap-1 bg-purple-100 hover:bg-purple-200 border-2 border-purple-300 text-purple-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          title="깃허브 업로드용 manifest.json 및 sw.js 파일 받기"
+        >
+          <span>📁</span>
+          <span class="hidden md:inline">PWA 파일</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ========================================================================
+         상단 8가지 한글 놀이 모드 전환 탭
+         ======================================================================== -->
+    <nav class="grid grid-cols-4 sm:grid-cols-8 gap-1 sm:gap-1.5 my-1 shrink-0" aria-label="놀이 모드 선택">
+      <button
+        id="tab-mode-typingbasic"
+        onclick="switchMode('typingbasic')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-amber-400 text-white border-amber-500 leading-tight"
+      >
+        <span>🐣</span>
+        <span class="truncate">타이핑(기본)</span>
+      </button>
+      <button
+        id="tab-mode-word"
+        onclick="switchMode('word')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-orange-700 border-orange-200 leading-tight"
+      >
+        <span>⌨️</span>
+        <span class="truncate">타이핑(심화)</span>
+      </button>
+      <button
+        id="tab-mode-same"
+        onclick="switchMode('same')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-sky-700 border-sky-200 leading-tight"
+      >
+        <span>🔤</span>
+        <span class="truncate">글자 완성(기본)</span>
+      </button>
+      <button
+        id="tab-mode-samehard"
+        onclick="switchMode('samehard')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-indigo-700 border-indigo-200 leading-tight"
+      >
+        <span>🧩</span>
+        <span class="truncate">글자 완성(심화)</span>
+      </button>
+      <button
+        id="tab-mode-wordmatchbasic"
+        onclick="switchMode('wordmatchbasic')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-teal-700 border-teal-200 leading-tight"
+      >
+        <span>🌱</span>
+        <span class="truncate">단어·그림(기본)</span>
+      </button>
+      <button
+        id="tab-mode-wordmatch"
+        onclick="switchMode('wordmatch')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-purple-700 border-purple-200 leading-tight"
+      >
+        <span>🔗</span>
+        <span class="truncate">단어·그림(심화)</span>
+      </button>
+      <button
+        id="tab-mode-sentencematch"
+        onclick="switchMode('sentencematch')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-rose-700 border-rose-200 leading-tight"
+      >
+        <span>📝</span>
+        <span class="truncate">문장 연결하기</span>
+      </button>
+      <button
+        id="tab-mode-listen"
+        onclick="switchMode('listen')"
+        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-emerald-700 border-emerald-200 leading-tight"
+      >
+        <span>🎧</span>
+        <span class="truncate">소리 듣고 찾기</span>
+      </button>
+    </nav>
+
+    <!-- ========================================================================
+         메인 게임 스테이지 (flex-1 min-h-0 으로 남은 높이에 100% 맞춤)
+         ======================================================================== -->
+    <main class="flex-1 min-h-0 w-full relative overflow-hidden flex flex-col">
+
+      <!-- ======================================================================
+           모드 1: [타이핑(기본)] (자음·쌍자음·모음·이중모음 1개 완성 후 엔터)
+           ====================================================================== -->
+      <section id="view-typingbasic" class="w-full h-full flex flex-col justify-between gap-1.5 overflow-hidden">
+        <!-- 상단 보조 컨트롤 바 -->
+        <div class="flex items-center justify-between px-2.5 py-1 bg-white/85 rounded-2xl border border-amber-200 shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-xs shrink-0">
+              자모 <strong id="typingbasic-progress">1 / 120</strong>
+            </span>
+            <span class="text-xs text-amber-800 truncate">
+              자음·모음을 입력한 뒤 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 완성해 보세요! (쌍자음·ㅒ·ㅖ는 <strong>⇧ 쉬프트</strong> 활용)
+            </span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              onclick="prevTypingBasicQuestion()"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              ◀ 이전
+            </button>
+            <button
+              onclick="nextTypingBasicQuestion()"
+              class="kid-btn bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-800 px-2 py-0.5 rounded-xl text-xs"
+            >
+              다음 ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- 중앙 자모 안내 & 입력 슬롯 영역 (타이핑 심화와 동일한 레이아웃, 이모지 없음) -->
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-amber-200 card-shadow px-3 py-1.5 sm:p-3 flex flex-row items-center justify-evenly gap-2 sm:gap-6 relative overflow-hidden">
+          <!-- 왼쪽: 목표 자모 & 예시 단어 듣기 -->
+          <button
+            onclick="speakCurrentTypingBasic()"
+            class="kid-btn flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-amber-50 transition shrink-0"
+            title="누르면 자모와 예시 단어를 읽어줘요"
+          >
+            <span id="typingbasic-type-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs mb-0.5 compact-hide">
+              기본 자음
+            </span>
+            <div id="typingbasic-target-display" class="emoji-hero font-bold text-amber-600 animate-float select-none">ㅅ</div>
+            <span id="typingbasic-word-display" class="mt-0.5 text-[11px] sm:text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              🔊 사자 (시옷)
+            </span>
+          </button>
+
+          <!-- 오른쪽: 단일 자모 슬롯 & 안내 -->
+          <div class="flex flex-col items-center justify-center gap-1 sm:gap-2 min-w-0">
+            <div id="typingbasic-guide" class="text-xs sm:text-base text-amber-800 bg-amber-50 border border-amber-200 px-3 py-0.5 rounded-full text-center truncate max-w-full">
+              키보드에서 알맞은 글쇠를 찾아 눌러 보세요!
+            </div>
+            <div id="typingbasic-slot-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+              <!-- JS로 단일 자모 슬롯 렌더링 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 하단 리얼 한글 두벌식 키보드 하우징 UI -->
+        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-1.5 sm:p-2.5 shadow-lg shrink-0">
+          <div id="keypad-keyboard-basic" class="bg-slate-800/15 rounded-2xl p-1 sm:p-1.5 flex flex-col gap-1 sm:gap-1.5 max-w-4xl mx-auto">
+            <!-- JS로 두벌식 키보드 렌더링 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 2: [타이핑(심화)] (실제 두벌식 키보드 + Shift + 엔터 제출)
+           ====================================================================== -->
+      <section id="view-word" class="w-full h-full hidden flex-col justify-between gap-1.5 overflow-hidden">
+        <!-- 상단 보조 컨트롤 바 -->
+        <div class="flex items-center justify-between px-2.5 py-1 bg-white/85 rounded-2xl border border-orange-200 shrink-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="bg-orange-100 text-orange-700 border border-orange-300 px-2 py-0.5 rounded-full text-xs shrink-0">
+              낱말 <strong id="word-progress">1 / 200</strong>
+            </span>
+            <span class="text-xs text-orange-700 truncate">
+              단어를 모두 입력한 뒤 오른쪽의 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 정답을 제출하세요!
+            </span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              onclick="prevWordQuestion()"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              ◀ 이전
+            </button>
+            <button
+              onclick="nextWordQuestion()"
+              class="kid-btn bg-orange-100 hover:bg-orange-200 border border-orange-300 text-orange-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              다음 ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- 중앙 그림 & 실시간 조합 글자 슬롯 영역 -->
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-orange-200 card-shadow px-3 py-1.5 sm:p-3 flex flex-row items-center justify-evenly gap-2 sm:gap-6 relative overflow-hidden">
+          <!-- 왼쪽: 그림 & 소리 듣기 -->
+          <button
+            onclick="speakCurrentWord()"
+            class="kid-btn flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-orange-50 transition shrink-0"
+            title="누르면 단어를 읽어줘요"
+          >
+            <div id="word-emoji" class="emoji-hero animate-float select-none">🦋</div>
+            <span class="mt-0.5 text-[11px] sm:text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+              🔊 단어 듣기
+            </span>
+          </button>
+
+          <!-- 오른쪽: 음절 슬롯 & 조합 안내 -->
+          <div class="flex flex-col items-center justify-center gap-1 sm:gap-2 min-w-0">
+            <div id="word-jamo-guide" class="text-xs sm:text-base text-orange-700 bg-orange-50 border border-orange-200 px-3 py-0.5 rounded-full text-center truncate max-w-full">
+              키보드의 자음과 모음을 눌러 글자를 완성해 보세요!
+            </div>
+            <div id="word-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+              <!-- JS로 음절 슬롯 렌더링 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 하단 리얼 한글 두벌식 키보드 하우징 UI -->
+        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-1.5 sm:p-2.5 shadow-lg shrink-0">
+          <!-- 실제 한글 두벌식 키보드 배열 컨테이너 -->
+          <div id="keypad-keyboard" class="bg-slate-800/15 rounded-2xl p-1 sm:p-1.5 flex flex-col gap-1 sm:gap-1.5 max-w-4xl mx-auto">
+            <!-- JS로 두벌식 키보드 렌더링 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 2: [같은 글자 찾기 (기본)] (가~하 첫 글자 빈칸 맞추기)
+           ====================================================================== -->
+      <section id="view-same" class="w-full h-full hidden flex-col justify-between gap-2 overflow-hidden">
+        <!-- 상단 보조 컨트롤 바 -->
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-sky-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-sky-100 text-sky-800 border border-sky-300 px-2.5 py-0.5 rounded-full text-xs sm:text-sm shrink-0">
+              문제 <strong id="same-progress">1 / 16</strong>
+            </span>
+            <span class="text-xs sm:text-sm text-sky-700 truncate">
+              빈칸 <strong>[ ? ]</strong>에 들어갈 첫 글자를 <strong>가~하</strong> 중에서 찾아보세요!
+            </span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              onclick="prevSameQuestion()"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              ◀ 이전
+            </button>
+            <button
+              onclick="nextSameQuestion()"
+              class="kid-btn bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              다음 ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- 중앙 문제 디스플레이: 그림 + [ ? ] 나머지 글자 -->
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-sky-200 card-shadow p-3 sm:p-5 flex flex-row items-center justify-evenly gap-3 sm:gap-8 overflow-hidden">
+          <button
+            onclick="speakSameWord()"
+            class="kid-btn flex flex-col items-center justify-center p-2 rounded-3xl hover:bg-sky-50 transition shrink-0"
+          >
+            <div id="same-emoji" class="emoji-hero animate-float select-none">🐿️</div>
+            <span class="mt-1 text-xs sm:text-sm text-sky-600 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
+              🔊 단어 듣기
+            </span>
+          </button>
+
+          <div class="flex flex-col items-center justify-center gap-2">
+            <div id="same-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+              <!-- 예: [ ? ] [ 람 ] [ 쥐 ] -->
+            </div>
+            <p id="same-guide-text" class="text-xs sm:text-base text-gray-500 text-center">
+              아래 <strong class="text-sky-600">가 ~ 하</strong> 보기에서 알맞은 글자를 눌러 주세요!
+            </p>
+          </div>
+        </div>
+
+        <!-- 하단 보기: 가, 나, 다, 라, 마, 바, 사, 아, 자, 차, 카, 타, 파, 하 (7x2 고정 그리드) -->
+        <div class="bg-sky-100/80 border-2 border-sky-200 rounded-3xl p-2 sm:p-3 shrink-0">
+          <div id="same-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto">
+            <!-- JS로 가~하 14개 버튼 생성 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 2-2: [같은 글자 찾기 (심화)] (모든 글자·모든 위치 빈칸 맞추기)
+           ====================================================================== -->
+      <section id="view-samehard" class="w-full h-full hidden flex-col justify-between gap-2 overflow-hidden">
+        <!-- 상단 보조 컨트롤 바 -->
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-indigo-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-0.5 rounded-full text-xs sm:text-sm shrink-0">
+              심화 <strong id="samehard-progress">1 / 31</strong>
+            </span>
+            <span class="text-xs sm:text-sm text-indigo-700 truncate">
+              단어의 빈칸 <strong>[ ? ]</strong>에 들어갈 알맞은 글자를 아래 보기에서 찾아보세요!
+            </span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              onclick="prevSameHardQuestion()"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              ◀ 이전
+            </button>
+            <button
+              onclick="nextSameHardQuestion()"
+              class="kid-btn bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 text-indigo-700 px-2 py-0.5 rounded-xl text-xs"
+            >
+              다음 ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- 중앙 문제 디스플레이: 그림 + 임의 위치 [ ? ] 슬롯 -->
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-indigo-200 card-shadow p-3 sm:p-5 flex flex-row items-center justify-evenly gap-3 sm:gap-8 overflow-hidden">
+          <button
+            onclick="speakSameHardWord()"
+            class="kid-btn flex flex-col items-center justify-center p-2 rounded-3xl hover:bg-indigo-50 transition shrink-0"
+          >
+            <div id="samehard-emoji" class="emoji-hero animate-float select-none">🌈</div>
+            <span class="mt-1 text-xs sm:text-sm text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+              🔊 단어 듣기
+            </span>
+          </button>
+
+          <div class="flex flex-col items-center justify-center gap-2">
+            <div id="samehard-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+              <!-- JS로 임의 위치 [ ? ] 슬롯 렌더링 -->
+            </div>
+            <p id="samehard-guide-text" class="text-xs sm:text-base text-gray-500 text-center">
+              아래 보기 중에서 빈칸에 들어갈 글자를 찾아 눌러 주세요!
+            </p>
+          </div>
+        </div>
+
+        <!-- 하단 보기: 정답 글자 포함 14개 랜덤 음절 (7x2 그리드) -->
+        <div class="bg-indigo-100/80 border-2 border-indigo-200 rounded-3xl p-2 sm:p-3 shrink-0">
+          <div id="samehard-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto">
+            <!-- JS로 14개 보기 버튼 생성 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 5: [단어·그림(기본)] (한 글자 단어 전용 선 잇기 매칭)
+           ====================================================================== -->
+      <section id="view-wordmatchbasic" class="w-full h-full hidden flex-col justify-between gap-1.5 overflow-hidden">
+        <!-- 상단 안내 바 -->
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-teal-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-teal-100 text-teal-800 border border-teal-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
+              단어·그림(기본: 한 글자)
+            </span>
+            <span class="text-xs sm:text-sm text-teal-800 truncate">
+              왼쪽 <strong>한 글자 낱말</strong>과 오른쪽 그림을 선으로 이어 보세요!
+            </span>
+          </div>
+          <button
+            onclick="setupMatchingGame('wordmatchbasic')"
+            class="kid-btn bg-teal-100 hover:bg-teal-200 border border-teal-300 text-teal-800 px-2.5 py-0.5 rounded-xl text-xs shrink-0"
+          >
+            🔄 새 문제
+          </button>
+        </div>
+
+        <!-- 선 잇기 보드 영역 -->
+        <div
+          id="board-wordmatchbasic"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-teal-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+        >
+          <!-- 연결 선 SVG 오버레이 -->
+          <svg id="svg-wordmatchbasic" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+
+          <!-- 왼쪽: 한 글자 단어 카드 4개 -->
+          <div id="left-col-wordmatchbasic" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+
+          <!-- 중앙 여유 공간 (선 연결 영역) -->
+          <div class="flex-1 h-full pointer-events-none"></div>
+
+          <!-- 오른쪽: 그림 카드 4개 -->
+          <div id="right-col-wordmatchbasic" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 6: [단어·그림(심화)] (선 잇기 매칭)
+           ====================================================================== -->
+      <section id="view-wordmatch" class="w-full h-full hidden flex-col justify-between gap-1.5 overflow-hidden">
+        <!-- 상단 안내 바 -->
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-purple-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-purple-100 text-purple-800 border border-purple-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
+              단어·그림(심화)
+            </span>
+            <span class="text-xs sm:text-sm text-purple-800 truncate">
+              왼쪽 단어와 오른쪽 그림을 <strong>선으로 끌어 잇거나 차례대로 터치</strong>해 보세요!
+            </span>
+          </div>
+          <button
+            onclick="setupMatchingGame('wordmatch')"
+            class="kid-btn bg-purple-100 hover:bg-purple-200 border border-purple-300 text-purple-800 px-2.5 py-0.5 rounded-xl text-xs shrink-0"
+          >
+            🔄 새 문제
+          </button>
+        </div>
+
+        <!-- 선 잇기 보드 영역 -->
+        <div
+          id="board-wordmatch"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-purple-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+        >
+          <!-- 연결 선 SVG 오버레이 -->
+          <svg id="svg-wordmatch" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+
+          <!-- 왼쪽: 단어 카드 4개 -->
+          <div id="left-col-wordmatch" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+
+          <!-- 중앙 여유 공간 (선 연결 영역) -->
+          <div class="flex-1 h-full pointer-events-none"></div>
+
+          <!-- 오른쪽: 그림 카드 4개 -->
+          <div id="right-col-wordmatch" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 4: [문장 연결하기] (앞 문장 + 뒷 문장 선 잇기)
+           ====================================================================== -->
+      <section id="view-sentencematch" class="w-full h-full hidden flex-col justify-between gap-1.5 overflow-hidden">
+        <!-- 상단 안내 바 -->
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-rose-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-rose-100 text-rose-800 border border-rose-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
+              문장 연결하기
+            </span>
+            <span class="text-xs sm:text-sm text-rose-800 truncate">
+              어울리는 앞 문장과 뒷 문장을 <strong>선으로 이어</strong> 문장을 완성해 보세요!
+            </span>
+          </div>
+          <button
+            onclick="setupMatchingGame('sentencematch')"
+            class="kid-btn bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-800 px-2.5 py-0.5 rounded-xl text-xs shrink-0"
+          >
+            🔄 새 문제
+          </button>
+        </div>
+
+        <!-- 문장 선 잇기 보드 영역 -->
+        <div
+          id="board-sentencematch"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-rose-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+        >
+          <!-- 연결 선 SVG 오버레이 -->
+          <svg id="svg-sentencematch" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+
+          <!-- 왼쪽: 앞 문장 4개 -->
+          <div id="left-col-sentencematch" class="w-[41%] sm:w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
+
+          <!-- 중앙 여유 공간 (선 연결 영역) -->
+          <div class="flex-1 h-full pointer-events-none"></div>
+
+          <!-- 오른쪽: 뒷 문장 4개 -->
+          <div id="right-col-sentencematch" class="w-[41%] sm:w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           모드 5: [소리 듣고 찾기] (정답 숨김 & 1.5초 간격 자동 반복 재생)
+           ====================================================================== -->
+      <section id="view-listen" class="w-full h-full hidden flex-col justify-between gap-2 overflow-hidden">
+        <!-- 상단 음성 문제 배너 (정답 단어를 표시하지 않고 안내 문구만 표시) -->
+        <div class="bg-white rounded-3xl border-4 border-emerald-200 card-shadow px-3 py-2 sm:p-3.5 flex items-center justify-between gap-2 shrink-0">
+          <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onclick="speakListenPrompt()"
+              class="kid-btn pill-shadow w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-xl sm:text-2xl shrink-0 border-2 border-emerald-600 animate-pulse"
+              title="문제 다시 듣기"
+            >
+              🔊
+            </button>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs">
+                  🔁 1.5초 자동 반복 중
+                </span>
+                <span id="listen-streak-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs">
+                  연속 정답: 0
+                </span>
+              </div>
+              <p id="listen-prompt-text" class="text-sm sm:text-xl text-gray-800 mt-0.5 truncate">
+                적절한 카드를 찾아 눌러 보세요!
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              onclick="speakListenPrompt()"
+              class="kid-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border-2 border-emerald-300 px-2.5 py-1.5 rounded-2xl text-xs sm:text-sm"
+            >
+              👂 문제 다시 듣기
+            </button>
+            <button
+              onclick="setupListenQuiz()"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 text-gray-700 border-2 border-gray-300 px-2.5 py-1.5 rounded-2xl text-xs sm:text-sm"
+            >
+              다른 문제 ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- 4지선다 큼직한 그림+낱말 카드 그리드 -->
+        <div id="listen-cards-grid" class="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-2.5 sm:gap-4">
+          <!-- JS로 4개 카드 렌더링 -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================================================
+         칭찬 토스트 배너 (정답 시 화면 중앙 하단에 부드럽게 팝업)
+         ======================================================================== -->
+    <div
+      id="praise-banner"
+      class="fixed left-1/2 bottom-6 -translate-x-1/2 z-40 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-4"
+    >
+      <div class="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-white px-6 py-3 rounded-full shadow-xl border-4 border-white flex items-center gap-2 text-lg sm:text-2xl whitespace-nowrap">
+        <span id="praise-emoji">🎉</span>
+        <span id="praise-text">참 잘했어요! 최고예요!</span>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         모달 1: 앱 설치 안내 모달 (iOS Safari 및 수동 설치 안내용)
+         ======================================================================== -->
+    <div
+      id="install-guide-modal"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4"
+      onclick="if(event.target === this) closeInstallModal()"
+    >
+      <div class="bg-white rounded-3xl border-4 border-orange-300 max-w-md w-full p-5 shadow-2xl animate-pop">
+        <div class="flex items-center justify-between border-b border-orange-100 pb-3 mb-3">
+          <h2 class="text-xl text-orange-600 flex items-center gap-2">
+            <span>📲</span>
+            <span>태블릿·모바일 앱 설치 방법</span>
+          </h2>
+          <button onclick="closeInstallModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
+        </div>
+
+        <div class="space-y-3 text-sm sm:text-base text-gray-700 font-sans">
+          <div class="bg-orange-50 border border-orange-200 rounded-2xl p-3">
+            <div class="font-bold text-orange-700 mb-1">🤖 안드로이드 (갤럭시 탭 / 스마트폰)</div>
+            <p class="text-xs sm:text-sm leading-relaxed">
+              Chrome 또는 삼성 인터넷 우측 상단 메뉴(<strong>⋮</strong> 또는 <strong>≡</strong>)를 누른 뒤 <strong>[앱 설치]</strong> 또는 <strong>[홈 화면에 추가]</strong>를 선택해 주세요.
+            </p>
+          </div>
+
+          <div class="bg-sky-50 border border-sky-200 rounded-2xl p-3">
+            <div class="font-bold text-sky-700 mb-1">🍎 아이패드 / 아이폰 (Safari)</div>
+            <p class="text-xs sm:text-sm leading-relaxed">
+              Safari 브라우저 상단 또는 하단의 <strong>[공유하기 📤]</strong> 버튼을 누른 뒤, 메뉴에서 <strong>[홈 화면에 추가 ➕]</strong>를 누르면 앱처럼 전체 화면으로 이용할 수 있어요!
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-end">
+          <button
+            onclick="closeInstallModal()"
+            class="kid-btn bg-orange-400 text-white px-5 py-2 rounded-2xl text-base"
+          >
+            확인했어요!
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         모달 2: 깃허브 배포용 PWA 파일 (manifest.json / sw.js) 원클릭 다운로드 & 복사
+         ======================================================================== -->
+    <div
+      id="pwa-files-modal"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-5"
+      onclick="if(event.target === this) closePwaModal()"
+    >
+      <div class="bg-white rounded-3xl border-4 border-purple-300 max-w-2xl w-full max-h-[90dvh] flex flex-col p-4 sm:p-5 shadow-2xl animate-pop">
+        <div class="flex items-center justify-between border-b border-purple-100 pb-2.5 mb-3 shrink-0">
+          <h2 class="text-lg sm:text-xl text-purple-700 flex items-center gap-2">
+            <span>📁</span>
+            <span>깃허브 홈페이지용 PWA 필수 파일 (manifest.json / sw.js)</span>
+          </h2>
+          <button onclick="closePwaModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 font-sans text-xs sm:text-sm text-gray-700">
+          <div class="bg-purple-50 border border-purple-200 rounded-2xl p-3">
+            <p class="font-bold text-purple-800 mb-1">💡 깃허브 페이지(GitHub Pages) 저장소 폴더 구성 안내</p>
+            <p class="leading-relaxed">
+              깃허브 저장소 루트 경로에 아래 <strong>5개 파일</strong>을 함께 올려주시면 아이콘 적용, 앱 설치 버튼, 그리고 <strong>캐시 방해 없는 즉시 코드 업데이트</strong>가 완벽하게 작동합니다:
+              <code class="bg-white px-1.5 py-0.5 rounded border text-purple-700">index.html</code>,
+              <code class="bg-white px-1.5 py-0.5 rounded border text-purple-700">manifest.json</code>,
+              <code class="bg-white px-1.5 py-0.5 rounded border text-purple-700">sw.js</code>,
+              <code class="bg-white px-1.5 py-0.5 rounded border text-purple-700">icon.ico</code>,
+              <code class="bg-white px-1.5 py-0.5 rounded border text-purple-700">icon.png</code>
+            </p>
+          </div>
+
+          <!-- manifest.json 섹션 -->
+          <div class="border-2 border-gray-200 rounded-2xl p-3 bg-gray-50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-gray-800">1️⃣ manifest.json (앱 설치 & 아이콘 설정)</span>
+              <div class="flex gap-1.5">
+                <button
+                  onclick="copyPwaFile('manifest')"
+                  class="kid-btn bg-white border border-gray-300 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700"
+                >
+                  📋 코드 복사
+                </button>
+                <button
+                  onclick="downloadPwaFile('manifest.json', MANIFEST_JSON_CONTENT, 'application/json')"
+                  class="kid-btn bg-purple-600 text-white px-2.5 py-1 rounded-xl text-xs font-bold"
+                >
+                  ⬇️ manifest.json 다운로드
+                </button>
+              </div>
+            </div>
+            <pre id="pre-manifest" class="bg-gray-900 text-emerald-300 p-2.5 rounded-xl overflow-x-auto text-[11px] leading-snug select-all"></pre>
+          </div>
+
+          <!-- sw.js 섹션 -->
+          <div class="border-2 border-gray-200 rounded-2xl p-3 bg-gray-50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-gray-800">2️⃣ sw.js (네트워크 우선·코드 수정 즉시 반영 서비스 워커)</span>
+              <div class="flex gap-1.5">
+                <button
+                  onclick="copyPwaFile('sw')"
+                  class="kid-btn bg-white border border-gray-300 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700"
+                >
+                  📋 코드 복사
+                </button>
+                <button
+                  onclick="downloadPwaFile('sw.js', SW_JS_CONTENT, 'application/javascript')"
+                  class="kid-btn bg-sky-600 text-white px-2.5 py-1 rounded-xl text-xs font-bold"
+                >
+                  ⬇️ sw.js 다운로드
+                </button>
+              </div>
+            </div>
+            <pre id="pre-sw" class="bg-gray-900 text-sky-300 p-2.5 rounded-xl overflow-x-auto text-[11px] leading-snug select-all"></pre>
+          </div>
+        </div>
+
+        <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between shrink-0">
+          <span id="copy-status-msg" class="text-xs text-emerald-600 font-sans font-bold"></span>
+          <button
+            onclick="closePwaModal()"
+            class="kid-btn bg-purple-500 text-white px-5 py-1.5 rounded-2xl text-sm"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         모달 3: 고품질 한국어 TTS 목소리 설정 모달 (신경망 음성 선택 / 클라우드 성우 / 속도·톤 조절)
+         ======================================================================== -->
+    <div
+      id="tts-settings-modal"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-5"
+      onclick="if(event.target === this) closeTtsModal()"
+    >
+      <div class="bg-white rounded-3xl border-4 border-indigo-300 max-w-lg w-full max-h-[90dvh] flex flex-col p-4 sm:p-5 shadow-2xl animate-pop">
+        <div class="flex items-center justify-between border-b border-indigo-100 pb-2.5 mb-3 shrink-0">
+          <h2 class="text-lg sm:text-xl text-indigo-700 flex items-center gap-2">
+            <span>🎙️</span>
+            <span>어린이 한글 목소리(TTS) 설정</span>
+          </h2>
+          <button onclick="closeTtsModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1 font-sans text-xs sm:text-sm text-gray-700">
+          <!-- 1. 원클릭 말투 프리셋 -->
+          <div>
+            <label class="block font-bold text-indigo-900 mb-1.5">✨ 추천 목소리 스타일 (원클릭 프리셋)</label>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                id="preset-btn-teacher"
+                onclick="applyTtsPreset('teacher')"
+                class="kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-indigo-50 border-indigo-400 text-indigo-900"
+              >
+                <div class="font-bold">👩‍🏫 또박또박 선생님</div>
+                <div class="text-[11px] text-gray-500">가장 정확하고 자연스러운 발음</div>
+              </button>
+              <button
+                type="button"
+                id="preset-btn-kid"
+                onclick="applyTtsPreset('kid')"
+                class="kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-white border-gray-200 text-gray-700"
+              >
+                <div class="font-bold">👧 밝고 귀여운 친구</div>
+                <div class="text-[11px] text-gray-500">통통 튀고 신나는 높은 톤</div>
+              </button>
+              <button
+                type="button"
+                id="preset-btn-slow"
+                onclick="applyTtsPreset('slow')"
+                class="kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-white border-gray-200 text-gray-700"
+              >
+                <div class="font-bold">🐢 천천히 정확한 발음</div>
+                <div class="text-[11px] text-gray-500">한 글자씩 또렷하게 듣기</div>
+              </button>
+              <button
+                type="button"
+                id="preset-btn-cloud"
+                onclick="applyTtsPreset('cloud')"
+                class="kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-white border-gray-200 text-gray-700"
+              >
+                <div class="font-bold">☁️ 클라우드 아나운서</div>
+                <div class="text-[11px] text-gray-500">기기 기본 음성이 아쉬울 때 추천</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 음성 엔진 및 기기 내 한국어 목소리 선택 -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="tts-voice-select" class="font-bold text-slate-800">🔊 음성 엔진 / 목소리 선택</label>
+              <span id="tts-voice-badge" class="text-[11px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">자동 고음질</span>
+            </div>
+            <select
+              id="tts-voice-select"
+              onchange="handleVoiceSelectChange(this.value)"
+              class="w-full rounded-xl border-2 border-indigo-200 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-gray-800 focus:outline-none focus:border-indigo-500"
+            >
+              <!-- JS로 기기 내 한국어 음성 목록 및 클라우드 음성 렌더링 -->
+            </select>
+            <p class="text-[11px] text-gray-500 leading-relaxed">
+              💡 <strong>팁:</strong> 목록에 <strong>★ 고음질(Natural / Google / Yuna / Sora)</strong> 표시가 있는 목소리나 <strong>☁️ 클라우드 아나운서</strong>를 선택하시면 훨씬 자연스럽게 읽어줍니다.
+            </p>
+          </div>
+
+          <!-- 3. 말하기 속도 & 목소리 톤 미세 조절 -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-3">
+            <div>
+              <div class="flex justify-between font-bold text-slate-800 mb-1">
+                <span>🏃 읽기 속도</span>
+                <span id="tts-rate-label" class="text-indigo-600">0.92x (또박또박)</span>
+              </div>
+              <input
+                id="tts-rate-slider"
+                type="range"
+                min="0.65"
+                max="1.25"
+                step="0.05"
+                value="0.92"
+                oninput="handleTtsSliderChange()"
+                class="w-full accent-indigo-500 cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <div class="flex justify-between font-bold text-slate-800 mb-1">
+                <span>🎵 목소리 높낮이(톤)</span>
+                <span id="tts-pitch-label" class="text-indigo-600">1.08 (다정하게)</span>
+              </div>
+              <input
+                id="tts-pitch-slider"
+                type="range"
+                min="0.80"
+                max="1.35"
+                step="0.05"
+                value="1.08"
+                oninput="handleTtsSliderChange()"
+                class="w-full accent-indigo-500 cursor-pointer"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2 shrink-0">
+          <button
+            type="button"
+            onclick="testTtsVoiceSample()"
+            class="kid-btn bg-amber-400 hover:bg-amber-500 text-white border-2 border-amber-500 px-4 py-1.5 rounded-2xl text-sm flex items-center gap-1.5"
+          >
+            <span>🔊</span>
+            <span>목소리 미리 듣기</span>
+          </button>
+          <button
+            type="button"
+            onclick="closeTtsModal()"
+            class="kid-btn bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-1.5 rounded-2xl text-sm"
+          >
+            적용 완료
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==========================================================================
+       자바스크립트: PWA 파일 정의, 데이터셋, 사운드 엔진, 6가지 한글 놀이 로직
+       ========================================================================== -->
+    <script>
+    /* ==========================================================================
+       0. 깃허브 페이지 배포용 manifest.json & sw.js 원본 코드
+       ========================================================================== */
+    const MANIFEST_JSON_CONTENT = `{
+  "name": "한글 쑥쑥 놀이터 - 어린이 한글 놀이",
+  "short_name": "한글놀이터",
+  "description": "태블릿과 모바일에서 즐기는 어린이 한글 놀이 게임",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF9F0",
+  "theme_color": "#FF8A65",
+  "icons": [
+    {
+      "src": "./icon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}`;
+
+    const SW_JS_CONTENT = `// 어린이 한글 놀이 게임 Service Worker (sw.js)
+const CACHE_NAME = 'hangul-playground-live-v2';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((key) => caches.delete(key)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    fetch(event.request, { cache: 'no-store' })
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.url.startsWith(self.location.origin)) {
+          const cloned = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
+  );
+});`;
+
+    /* ==========================================================================
+       1. 한글 놀이 전체 데이터셋 (1 이모지 = 1 단어 엄격 1:1 매칭)
+       ========================================================================== */
+    // 모드 2 (타이핑 심화), 모드 4 (같은 글자 심화), 모드 6 (단어·그림 심화), 모드 8 (소리 듣고 찾기) 공통 2글자 이상 낱말 데이터 (242개: 1글자 단어 이모지와도 중복 없음)
+    const WORD_LIST = [
+      // [동물 · 곤충 · 바다 · 새 친구] (68개)
+      { word: '강아지', emoji: '🐶', category: '동물 친구' },
+      { word: '고양이', emoji: '🐱', category: '동물 친구' },
+      { word: '호랑이', emoji: '🐯', category: '동물 친구' },
+      { word: '사자', emoji: '🦁', category: '동물 친구' },
+      { word: '토끼', emoji: '🐰', category: '쌍자음 낱말' },
+      { word: '코끼리', emoji: '🐘', category: '쌍자음 낱말' },
+      { word: '다람쥐', emoji: '🐿️', category: '이중모음 낱말' },
+      { word: '고슴도치', emoji: '🦔', category: '동물 친구' },
+      { word: '박쥐', emoji: '🦇', category: '이중모음 낱말' },
+      { word: '여우', emoji: '🦊', category: '동물 친구' },
+      { word: '늑대', emoji: '🐺', category: '이중모음 낱말' },
+      { word: '너구리', emoji: '🦝', category: '동물 친구' },
+      { word: '판다', emoji: '🐼', category: '동물 친구' },
+      { word: '북극곰', emoji: '🐻‍❄️', category: '동물 친구' },
+      { word: '코알라', emoji: '🐨', category: '동물 친구' },
+      { word: '캥거루', emoji: '🦘', category: '동물 친구' },
+      { word: '기린', emoji: '🦒', category: '동물 친구' },
+      { word: '얼룩말', emoji: '🦓', category: '동물 친구' },
+      { word: '낙타', emoji: '🐪', category: '동물 친구' },
+      { word: '하마', emoji: '🦛', category: '동물 친구' },
+      { word: '코뿔소', emoji: '🦏', category: '쌍자음 낱말' },
+      { word: '돼지', emoji: '🐷', category: '이중모음 낱말' },
+      { word: '원숭이', emoji: '🐵', category: '이중모음 낱말' },
+      { word: '고릴라', emoji: '🦍', category: '동물 친구' },
+      { word: '사슴', emoji: '🦌', category: '동물 친구' },
+      { word: '나무늘보', emoji: '🦥', category: '동물 친구' },
+      { word: '라마', emoji: '🦙', category: '동물 친구' },
+      { word: '개구리', emoji: '🐸', category: '이중모음 낱말' },
+      { word: '거북이', emoji: '🐢', category: '동물 친구' },
+      { word: '악어', emoji: '🐊', category: '동물 친구' },
+      { word: '도마뱀', emoji: '🦎', category: '이중모음 낱말' },
+      { word: '공룡', emoji: '🦖', category: '동물 친구' },
+      { word: '독수리', emoji: '🦅', category: '새 친구' },
+      { word: '부엉이', emoji: '🦉', category: '새 친구' },
+      { word: '오리', emoji: '🦆', category: '새 친구' },
+      { word: '백조', emoji: '🦢', category: '이중모음 낱말' },
+      { word: '비둘기', emoji: '🕊️', category: '새 친구' },
+      { word: '앵무새', emoji: '🦜', category: '이중모음 낱말' },
+      { word: '공작새', emoji: '🦚', category: '이중모음 낱말' },
+      { word: '홍학', emoji: '🦩', category: '새 친구' },
+      { word: '펭귄', emoji: '🐧', category: '이중모음 낱말' },
+      { word: '병아리', emoji: '🐥', category: '동물 친구' },
+      { word: '수탉', emoji: '🐓', category: '동물 친구' },
+      { word: '칠면조', emoji: '🦃', category: '새 친구' },
+      { word: '까마귀', emoji: '🐦‍⬛', category: '쌍자음 낱말' },
+      { word: '고래', emoji: '🐳', category: '이중모음 낱말' },
+      { word: '돌고래', emoji: '🐬', category: '이중모음 낱말' },
+      { word: '상어', emoji: '🦈', category: '바다 친구' },
+      { word: '문어', emoji: '🐙', category: '바다 친구' },
+      { word: '오징어', emoji: '🦑', category: '바다 친구' },
+      { word: '새우', emoji: '🦐', category: '이중모음 낱말' },
+      { word: '소라', emoji: '🐚', category: '바다 친구' },
+      { word: '해파리', emoji: '🪼', category: '이중모음 낱말' },
+      { word: '물고기', emoji: '🐟', category: '바다 친구' },
+      { word: '복어', emoji: '🐡', category: '바다 친구' },
+      { word: '물개', emoji: '🦭', category: '이중모음 낱말' },
+      { word: '가재', emoji: '🦞', category: '이중모음 낱말' },
+      { word: '나비', emoji: '🦋', category: '곤충 친구' },
+      { word: '꿀벌', emoji: '🐝', category: '쌍자음 낱말' },
+      { word: '무당벌레', emoji: '🐞', category: '이중모음 낱말' },
+      { word: '개미', emoji: '🐜', category: '이중모음 낱말' },
+      { word: '거미', emoji: '🕷️', category: '곤충 친구' },
+      { word: '메뚜기', emoji: '🦗', category: '쌍자음 낱말' },
+      { word: '달팽이', emoji: '🐌', category: '이중모음 낱말' },
+      { word: '애벌레', emoji: '🐛', category: '이중모음 낱말' },
+      { word: '풍뎅이', emoji: '🪲', category: '이중모음 낱말' },
+      { word: '지렁이', emoji: '🪱', category: '곤충 친구' },
+      { word: '전갈', emoji: '🦂', category: '곤충 친구' },
+      { word: '모기', emoji: '🦟', category: '곤충 친구' },
+      { word: '파리', emoji: '🪰', category: '곤충 친구' },
+
+      // [과일 · 채소 · 음식 · 간식 친구] (62개)
+      { word: '사과', emoji: '🍎', category: '이중모음 낱말' },
+      { word: '바나나', emoji: '🍌', category: '과일 친구' },
+      { word: '수박', emoji: '🍉', category: '과일 친구' },
+      { word: '포도', emoji: '🍇', category: '과일 친구' },
+      { word: '딸기', emoji: '🍓', category: '쌍자음 낱말' },
+      { word: '복숭아', emoji: '🍑', category: '과일 친구' },
+      { word: '오렌지', emoji: '🍊', category: '이중모음 낱말' },
+      { word: '레몬', emoji: '🍋', category: '이중모음 낱말' },
+      { word: '라임', emoji: '🍋‍🟩', category: '과일 친구' },
+      { word: '파인애플', emoji: '🍍', category: '이중모음 낱말' },
+      { word: '체리', emoji: '🍒', category: '이중모음 낱말' },
+      { word: '멜론', emoji: '🍈', category: '이중모음 낱말' },
+      { word: '키위', emoji: '🥝', category: '이중모음 낱말' },
+      { word: '망고', emoji: '🥭', category: '과일 친구' },
+      { word: '블루베리', emoji: '🫐', category: '이중모음 낱말' },
+      { word: '코코넛', emoji: '🥥', category: '과일 친구' },
+      { word: '아보카도', emoji: '🥑', category: '채소 친구' },
+      { word: '토마토', emoji: '🍅', category: '채소 친구' },
+      { word: '가지', emoji: '🍆', category: '채소 친구' },
+      { word: '옥수수', emoji: '🌽', category: '채소 친구' },
+      { word: '당근', emoji: '🥕', category: '채소 친구' },
+      { word: '오이', emoji: '🥒', category: '채소 친구' },
+      { word: '고추', emoji: '🌶️', category: '채소 친구' },
+      { word: '피망', emoji: '🫑', category: '채소 친구' },
+      { word: '브로콜리', emoji: '🥦', category: '채소 친구' },
+      { word: '양파', emoji: '🧅', category: '채소 친구' },
+      { word: '마늘', emoji: '🧄', category: '채소 친구' },
+      { word: '감자', emoji: '🥔', category: '채소 친구' },
+      { word: '고구마', emoji: '🍠', category: '채소 친구' },
+      { word: '버섯', emoji: '🍄', category: '채소 친구' },
+      { word: '땅콩', emoji: '🥜', category: '쌍자음 낱말' },
+      { word: '생강', emoji: '🫚', category: '이중모음 낱말' },
+      { word: '아이스크림', emoji: '🍦', category: '간식 친구' },
+      { word: '초콜릿', emoji: '🍫', category: '간식 친구' },
+      { word: '사탕', emoji: '🍬', category: '간식 친구' },
+      { word: '막대사탕', emoji: '🍭', category: '이중모음 낱말' },
+      { word: '도넛', emoji: '🍩', category: '간식 친구' },
+      { word: '케이크', emoji: '🎂', category: '이중모음 낱말' },
+      { word: '쿠키', emoji: '🍪', category: '간식 친구' },
+      { word: '크루아상', emoji: '🥐', category: '간식 친구' },
+      { word: '바게트', emoji: '🥖', category: '이중모음 낱말' },
+      { word: '프레첼', emoji: '🥨', category: '이중모음 낱말' },
+      { word: '핫도그', emoji: '🌭', category: '간식 친구' },
+      { word: '햄버거', emoji: '🍔', category: '이중모음 낱말' },
+      { word: '피자', emoji: '🍕', category: '간식 친구' },
+      { word: '감자튀김', emoji: '🍟', category: '이중모음 낱말' },
+      { word: '샌드위치', emoji: '🥪', category: '이중모음 낱말' },
+      { word: '타코', emoji: '🌮', category: '음식 친구' },
+      { word: '만두', emoji: '🥟', category: '음식 친구' },
+      { word: '삼각김밥', emoji: '🍙', category: '음식 친구' },
+      { word: '초밥', emoji: '🍣', category: '음식 친구' },
+      { word: '새우튀김', emoji: '🍤', category: '이중모음 낱말' },
+      { word: '떡꼬치', emoji: '🍡', category: '쌍자음 낱말' },
+      { word: '어묵', emoji: '🍢', category: '음식 친구' },
+      { word: '라면', emoji: '🍜', category: '음식 친구' },
+      { word: '스파게티', emoji: '🍝', category: '이중모음 낱말' },
+      { word: '카레', emoji: '🍛', category: '이중모음 낱말' },
+      { word: '찌개', emoji: '🍲', category: '쌍자음 낱말' },
+      { word: '계란', emoji: '🥚', category: '이중모음 낱말' },
+      { word: '계란프라이', emoji: '🍳', category: '이중모음 낱말' },
+      { word: '치즈', emoji: '🧀', category: '간식 친구' },
+      { word: '팝콘', emoji: '🍿', category: '간식 친구' },
+      { word: '고기', emoji: '🥩', category: '음식 친구' },
+      { word: '우유', emoji: '🥛', category: '음식 친구' },
+      { word: '주스', emoji: '🧃', category: '음식 친구' },
+      { word: '음료', emoji: '🥤', category: '음식 친구' },
+      { word: '소금', emoji: '🧂', category: '음식 친구' },
+
+      // [탈것 · 운동 · 자연 친구] (53개)
+      { word: '자동차', emoji: '🚗', category: '탈것 친구' },
+      { word: '소방차', emoji: '🚒', category: '탈것 친구' },
+      { word: '경찰차', emoji: '🚓', category: '탈것 친구' },
+      { word: '구급차', emoji: '🚑', category: '탈것 친구' },
+      { word: '택시', emoji: '🚕', category: '이중모음 낱말' },
+      { word: '버스', emoji: '🚌', category: '탈것 친구' },
+      { word: '트럭', emoji: '🚚', category: '탈것 친구' },
+      { word: '자전거', emoji: '🚲', category: '탈것 친구' },
+      { word: '오토바이', emoji: '🏍️', category: '탈것 친구' },
+      { word: '킥보드', emoji: '🛴', category: '탈것 친구' },
+      { word: '기차', emoji: '🚂', category: '탈것 친구' },
+      { word: '지하철', emoji: '🚇', category: '탈것 친구' },
+      { word: '비행기', emoji: '✈️', category: '이중모음 낱말' },
+      { word: '헬리콥터', emoji: '🚁', category: '이중모음 낱말' },
+      { word: '로켓', emoji: '🚀', category: '이중모음 낱말' },
+      { word: '인공위성', emoji: '🛰️', category: '이중모음 낱말' },
+      { word: '나룻배', emoji: '🛶', category: '이중모음 낱말' },
+      { word: '바퀴', emoji: '🛞', category: '이중모음 낱말' },
+      { word: '신호등', emoji: '🚦', category: '탈것 친구' },
+      { word: '도로', emoji: '🛣️', category: '탈것 친구' },
+      { word: '농구공', emoji: '🏀', category: '운동 친구' },
+      { word: '야구공', emoji: '⚾', category: '운동 친구' },
+      { word: '배구공', emoji: '🏐', category: '이중모음 낱말' },
+      { word: '라켓', emoji: '🎾', category: '이중모음 낱말' },
+      { word: '스케이트', emoji: '⛸️', category: '이중모음 낱말' },
+      { word: '썰매', emoji: '🛷', category: '쌍자음 낱말' },
+      { word: '볼링', emoji: '🎳', category: '운동 친구' },
+      { word: '다트', emoji: '🎯', category: '운동 친구' },
+      { word: '권투장갑', emoji: '🥊', category: '이중모음 낱말' },
+      { word: '트로피', emoji: '🏆', category: '운동 친구' },
+      { word: '금메달', emoji: '🥇', category: '이중모음 낱말' },
+      { word: '무지개', emoji: '🌈', category: '이중모음 낱말' },
+      { word: '구름', emoji: '☁️', category: '자연 친구' },
+      { word: '눈송이', emoji: '❄️', category: '자연 친구' },
+      { word: '눈사람', emoji: '⛄', category: '겨울 친구' },
+      { word: '번개', emoji: '⚡', category: '이중모음 낱말' },
+      { word: '회오리', emoji: '🌪️', category: '이중모음 낱말' },
+      { word: '파도', emoji: '🌊', category: '자연 친구' },
+      { word: '화산', emoji: '🌋', category: '이중모음 낱말' },
+      { word: '사막', emoji: '🏜️', category: '자연 친구' },
+      { word: '지구', emoji: '🌍', category: '자연 친구' },
+      { word: '은하수', emoji: '🌌', category: '자연 친구' },
+      { word: '나무', emoji: '🌳', category: '자연 친구' },
+      { word: '야자수', emoji: '🌴', category: '자연 친구' },
+      { word: '선인장', emoji: '🌵', category: '자연 친구' },
+      { word: '해바라기', emoji: '🌻', category: '이중모음 낱말' },
+      { word: '장미', emoji: '🌹', category: '자연 친구' },
+      { word: '튤립', emoji: '🌷', category: '자연 친구' },
+      { word: '무궁화', emoji: '🌺', category: '이중모음 낱말' },
+      { word: '연꽃', emoji: '🪷', category: '쌍자음 낱말' },
+      { word: '라벤더', emoji: '🪻', category: '이중모음 낱말' },
+      { word: '꽃다발', emoji: '💐', category: '쌍자음 낱말' },
+      { word: '새싹', emoji: '🌱', category: '쌍자음 낱말' },
+      { word: '나뭇잎', emoji: '🌿', category: '자연 친구' },
+      { word: '클로버', emoji: '🍀', category: '자연 친구' },
+      { word: '단풍', emoji: '🍁', category: '자연 친구' },
+      { word: '대나무', emoji: '🎋', category: '이중모음 낱말' },
+
+      // [학교 · 악기 · 생활 · 사람 친구] (108개)
+      { word: '가방', emoji: '🎒', category: '학교 친구' },
+      { word: '연필', emoji: '✏️', category: '학교 친구' },
+      { word: '크레파스', emoji: '🖍️', category: '이중모음 낱말' },
+      { word: '팔레트', emoji: '🎨', category: '이중모음 낱말' },
+      { word: '가위', emoji: '✂️', category: '이중모음 낱말' },
+      { word: '자석', emoji: '🧲', category: '학교 친구' },
+      { word: '현미경', emoji: '🔬', category: '학교 친구' },
+      { word: '망원경', emoji: '🔭', category: '이중모음 낱말' },
+      { word: '나침반', emoji: '🧭', category: '학교 친구' },
+      { word: '달력', emoji: '📅', category: '학교 친구' },
+      { word: '시계', emoji: '⌚', category: '이중모음 낱말' },
+      { word: '모래시계', emoji: '⏳', category: '이중모음 낱말' },
+      { word: '종이', emoji: '📄', category: '학교 친구' },
+      { word: '파일', emoji: '📁', category: '학교 친구' },
+      { word: '차트', emoji: '📊', category: '학교 친구' },
+      { word: '우체통', emoji: '📮', category: '이중모음 낱말' },
+      { word: '피아노', emoji: '🎹', category: '악기 친구' },
+      { word: '바이올린', emoji: '🎻', category: '악기 친구' },
+      { word: '기타', emoji: '🎸', category: '악기 친구' },
+      { word: '나팔', emoji: '🎺', category: '악기 친구' },
+      { word: '마라카스', emoji: '🪇', category: '악기 친구' },
+      { word: '타악기', emoji: '🪘', category: '악기 친구' },
+      { word: '아코디언', emoji: '🪗', category: '악기 친구' },
+      { word: '마이크', emoji: '🎤', category: '생활 친구' },
+      { word: '음표', emoji: '🎵', category: '악기 친구' },
+      { word: '라디오', emoji: '📻', category: '생활 친구' },
+      { word: '카세트', emoji: '📼', category: '이중모음 낱말' },
+      { word: '텔레비전', emoji: '📺', category: '이중모음 낱말' },
+      { word: '컴퓨터', emoji: '💻', category: '생활 친구' },
+      { word: '키보드', emoji: '⌨️', category: '생활 친구' },
+      { word: '전화기', emoji: '☎️', category: '이중모음 낱말' },
+      { word: '카메라', emoji: '📷', category: '이중모음 낱말' },
+      { word: '손전등', emoji: '🔦', category: '생활 친구' },
+      { word: '전구', emoji: '💡', category: '생활 친구' },
+      { word: '양초', emoji: '🕯️', category: '생활 친구' },
+      { word: '열쇠', emoji: '🔑', category: '이중모음 낱말' },
+      { word: '자물쇠', emoji: '🔒', category: '이중모음 낱말' },
+      { word: '우산', emoji: '☂️', category: '생활 친구' },
+      { word: '파라솔', emoji: '🏖️', category: '생활 친구' },
+      { word: '안경', emoji: '👓', category: '생활 친구' },
+      { word: '선글라스', emoji: '🕶️', category: '생활 친구' },
+      { word: '마스크', emoji: '😷', category: '생활 친구' },
+      { word: '모자', emoji: '🧢', category: '생활 친구' },
+      { word: '왕관', emoji: '👑', category: '이중모음 낱말' },
+      { word: '장갑', emoji: '🧤', category: '생활 친구' },
+      { word: '목도리', emoji: '🧣', category: '생활 친구' },
+      { word: '양말', emoji: '🧦', category: '생활 친구' },
+      { word: '티셔츠', emoji: '👕', category: '생활 친구' },
+      { word: '바지', emoji: '👖', category: '생활 친구' },
+      { word: '원피스', emoji: '👗', category: '이중모음 낱말' },
+      { word: '도복', emoji: '🥋', category: '생활 친구' },
+      { word: '운동화', emoji: '👟', category: '이중모음 낱말' },
+      { word: '장화', emoji: '🥾', category: '이중모음 낱말' },
+      { word: '구두', emoji: '👞', category: '생활 친구' },
+      { word: '하이힐', emoji: '👠', category: '생활 친구' },
+      { word: '파우치', emoji: '👛', category: '생활 친구' },
+      { word: '반지', emoji: '💍', category: '생활 친구' },
+      { word: '다이아몬드', emoji: '💎', category: '생활 친구' },
+      { word: '립스틱', emoji: '💄', category: '생활 친구' },
+      { word: '거울', emoji: '🪞', category: '생활 친구' },
+      { word: '칫솔', emoji: '🪥', category: '생활 친구' },
+      { word: '비누', emoji: '🧼', category: '생활 친구' },
+      { word: '빗자루', emoji: '🧹', category: '생활 친구' },
+      { word: '바구니', emoji: '🧺', category: '생활 친구' },
+      { word: '쓰레기통', emoji: '🗑️', category: '쌍자음 낱말' },
+      { word: '카트', emoji: '🛒', category: '생활 친구' },
+      { word: '변기', emoji: '🚽', category: '생활 친구' },
+      { word: '욕조', emoji: '🛁', category: '생활 친구' },
+      { word: '침대', emoji: '🛏️', category: '이중모음 낱말' },
+      { word: '소파', emoji: '🛋️', category: '생활 친구' },
+      { word: '의자', emoji: '🪑', category: '이중모음 낱말' },
+      { word: '창문', emoji: '🪟', category: '생활 친구' },
+      { word: '사다리', emoji: '🪜', category: '생활 친구' },
+      { word: '벽돌', emoji: '🧱', category: '생활 친구' },
+      { word: '차단기', emoji: '🚧', category: '생활 친구' },
+      { word: '타워크레인', emoji: '🏗️', category: '이중모음 낱말' },
+      { word: '화분', emoji: '🪴', category: '이중모음 낱말' },
+      { word: '선물', emoji: '🎁', category: '생활 친구' },
+      { word: '풍선', emoji: '🎈', category: '생활 친구' },
+      { word: '곰인형', emoji: '🧸', category: '생활 친구' },
+      { word: '가면', emoji: '🎭', category: '생활 친구' },
+      { word: '리본', emoji: '🎀', category: '생활 친구' },
+      { word: '차주전자', emoji: '🫖', category: '생활 친구' },
+      { word: '찻잔', emoji: '🍵', category: '생활 친구' },
+      { word: '커피', emoji: '☕', category: '음식 친구' },
+      { word: '숟가락', emoji: '🥄', category: '생활 친구' },
+      { word: '젓가락', emoji: '🥢', category: '생활 친구' },
+      { word: '뜨개질', emoji: '🧶', category: '쌍자음 낱말' },
+      { word: '바늘', emoji: '🪡', category: '생활 친구' },
+      { word: '청진기', emoji: '🩺', category: '생활 친구' },
+      { word: '주사기', emoji: '💉', category: '생활 친구' },
+      { word: '반창고', emoji: '🩹', category: '생활 친구' },
+      { word: '소화기', emoji: '🧯', category: '이중모음 낱말' },
+      { word: '학교', emoji: '🏫', category: '생활 친구' },
+      { word: '병원', emoji: '🏥', category: '이중모음 낱말' },
+      { word: '아파트', emoji: '🏢', category: '생활 친구' },
+      { word: '다리', emoji: '🌉', category: '생활 친구' },
+      { word: '자유의 여신상', emoji: '🗽', category: '생활 친구' },
+      { word: '분수', emoji: '⛲', category: '생활 친구' },
+      { word: '관람차', emoji: '🎡', category: '이중모음 낱말' },
+      { word: '회전목마', emoji: '🎠', category: '이중모음 낱말' },
+      { word: '텐트', emoji: '🏕️', category: '이중모음 낱말' },
+      { word: '아기', emoji: '👶', category: '사람 친구' },
+      { word: '오빠', emoji: '👦', category: '쌍자음 낱말' },
+      { word: '아빠', emoji: '👨', category: '쌍자음 낱말' },
+      { word: '엄마', emoji: '👩', category: '사람 친구' },
+      { word: '할아버지', emoji: '👴', category: '사람 친구' },
+      { word: '할머니', emoji: '👵', category: '사람 친구' },
+      { word: '가족', emoji: '👨‍👩‍👧', category: '사람 친구' },
+      { word: '쌍둥이', emoji: '👯', category: '쌍자음 낱말' },
+      { word: '신부', emoji: '👰', category: '사람 친구' },
+      { word: '요리사', emoji: '🧑‍🍳', category: '사람 친구' },
+      { word: '의사', emoji: '👩‍⚕️', category: '이중모음 낱말' },
+      { word: '경찰관', emoji: '👮', category: '이중모음 낱말' },
+      { word: '소방관', emoji: '👨‍🚒', category: '이중모음 낱말' },
+      { word: '마법사', emoji: '🧙', category: '사람 친구' },
+      { word: '도깨비', emoji: '👹', category: '쌍자음 낱말' },
+      { word: '로봇', emoji: '🤖', category: '생활 친구' },
+      { word: '유령', emoji: '👻', category: '생활 친구' },
+      { word: '눈동자', emoji: '👁️', category: '생활 친구' },
+      { word: '입술', emoji: '💋', category: '생활 친구' },
+      { word: '악수', emoji: '🤝', category: '생활 친구' },
+      { word: '하품', emoji: '🥱', category: '생활 친구' },
+      { word: '달리기', emoji: '🏃', category: '운동 친구' },
+      { word: '씨름', emoji: '🤼', category: '쌍자음 낱말' },
+      { word: '하키', emoji: '🏒', category: '운동 친구' },
+      { word: '하트', emoji: '❤️', category: '생활 친구' },
+      { word: '말풍선', emoji: '💬', category: '생활 친구' },
+      { word: '티켓', emoji: '🎫', category: '이중모음 낱말' },
+      { word: '구멍', emoji: '🕳️', category: '생활 친구' }
+    ];
+
+    // 모드 5: [단어·그림(기본)] 전용 한 글자 단어 데이터 (53개: WORD_LIST와도 이모지가 절대 겹치지 않는 순수 1:1 매칭)
+    const SINGLE_CHAR_WORD_LIST = [
+      { word: '밥', emoji: '🍚' }, { word: '빵', emoji: '🍞' }, { word: '꿀', emoji: '🍯' }, { word: '콩', emoji: '🫘' },
+      { word: '밤', emoji: '🌰' }, { word: '배', emoji: '🚢' }, { word: '집', emoji: '🏠' }, { word: '문', emoji: '🚪' },
+      { word: '성', emoji: '🏰' }, { word: '종', emoji: '🔔' }, { word: '북', emoji: '🥁' }, { word: '칼', emoji: '🔪' },
+      { word: '붓', emoji: '🖌️' }, { word: '실', emoji: '🧵' }, { word: '연', emoji: '🪁' }, { word: '활', emoji: '🏹' },
+      { word: '책', emoji: '📕' }, { word: '펜', emoji: '🖊️' }, { word: '공', emoji: '⚽' }, { word: '돈', emoji: '💵' },
+      { word: '약', emoji: '💊' }, { word: '톱', emoji: '🪚' }, { word: '닻', emoji: '⚓' }, { word: '뼈', emoji: '🦴' },
+      { word: '해', emoji: '☀️' }, { word: '달', emoji: '🌙' }, { word: '별', emoji: '⭐' }, { word: '비', emoji: '🌧️' },
+      { word: '불', emoji: '🔥' }, { word: '물', emoji: '💧' }, { word: '산', emoji: '⛰️' }, { word: '돌', emoji: '🪨' },
+      { word: '꽃', emoji: '🌸' }, { word: '벼', emoji: '🌾' }, { word: '눈', emoji: '👀' }, { word: '코', emoji: '👃' },
+      { word: '입', emoji: '👄' }, { word: '귀', emoji: '👂' }, { word: '손', emoji: '✋' }, { word: '발', emoji: '🦶' },
+      { word: '팔', emoji: '💪' }, { word: '이', emoji: '🦷' }, { word: '혀', emoji: '👅' }, { word: '왕', emoji: '🤴' },
+      { word: '곰', emoji: '🐻' }, { word: '소', emoji: '🐮' }, { word: '말', emoji: '🐴' }, { word: '양', emoji: '🐑' },
+      { word: '닭', emoji: '🐔' }, { word: '쥐', emoji: '🐭' }, { word: '뱀', emoji: '🐍' }, { word: '새', emoji: '🐦' },
+      { word: '게', emoji: '🦀' }, { word: '용', emoji: '🐉' }, { word: '자', emoji: '📏' }
+    ];
+
+    // 모드 1: [타이핑(기본)] 전용 자음·쌍자음·모음·이중모음 데이터 (모든 예시 단어·이모지가 WORD_LIST / SINGLE_CHAR_WORD_LIST와 100% 1:1 일치)
+    const BASIC_TYPING_LIST = [
+      // 기본 자음 14개
+      { target: 'ㄱ', name: '기역', word: '가방', emoji: '🎒', category: '기본 자음' },
+      { target: 'ㄱ', name: '기역', word: '거북이', emoji: '🐢', category: '기본 자음' },
+      { target: 'ㄱ', name: '기역', word: '고래', emoji: '🐳', category: '기본 자음' },
+      { target: 'ㄱ', name: '기역', word: '구름', emoji: '☁️', category: '기본 자음' },
+      { target: 'ㄴ', name: '니은', word: '나비', emoji: '🦋', category: '기본 자음' },
+      { target: 'ㄴ', name: '니은', word: '나무', emoji: '🌳', category: '기본 자음' },
+      { target: 'ㄴ', name: '니은', word: '눈사람', emoji: '⛄', category: '기본 자음' },
+      { target: 'ㄴ', name: '니은', word: '나팔', emoji: '🎺', category: '기본 자음' },
+      { target: 'ㄷ', name: '디귿', word: '다람쥐', emoji: '🐿️', category: '기본 자음' },
+      { target: 'ㄷ', name: '디귿', word: '도마뱀', emoji: '🦎', category: '기본 자음' },
+      { target: 'ㄷ', name: '디귿', word: '달팽이', emoji: '🐌', category: '기본 자음' },
+      { target: 'ㄷ', name: '디귿', word: '도로', emoji: '🛣️', category: '기본 자음' },
+      { target: 'ㄹ', name: '리을', word: '라디오', emoji: '📻', category: '기본 자음' },
+      { target: 'ㄹ', name: '리을', word: '로켓', emoji: '🚀', category: '기본 자음' },
+      { target: 'ㄹ', name: '리을', word: '레몬', emoji: '🍋', category: '기본 자음' },
+      { target: 'ㄹ', name: '리을', word: '리본', emoji: '🎀', category: '기본 자음' },
+      { target: 'ㅁ', name: '미음', word: '마이크', emoji: '🎤', category: '기본 자음' },
+      { target: 'ㅁ', name: '미음', word: '모자', emoji: '🧢', category: '기본 자음' },
+      { target: 'ㅁ', name: '미음', word: '무지개', emoji: '🌈', category: '기본 자음' },
+      { target: 'ㅁ', name: '미음', word: '문어', emoji: '🐙', category: '기본 자음' },
+      { target: 'ㅂ', name: '비읍', word: '바나나', emoji: '🍌', category: '기본 자음' },
+      { target: 'ㅂ', name: '비읍', word: '비행기', emoji: '✈️', category: '기본 자음' },
+      { target: 'ㅂ', name: '비읍', word: '버스', emoji: '🚌', category: '기본 자음' },
+      { target: 'ㅂ', name: '비읍', word: '바지', emoji: '👖', category: '기본 자음' },
+      { target: 'ㅅ', name: '시옷', word: '사자', emoji: '🦁', category: '기본 자음' },
+      { target: 'ㅅ', name: '시옷', word: '수박', emoji: '🍉', category: '기본 자음' },
+      { target: 'ㅅ', name: '시옷', word: '시계', emoji: '⌚', category: '기본 자음' },
+      { target: 'ㅅ', name: '시옷', word: '사슴', emoji: '🦌', category: '기본 자음' },
+      { target: 'ㅇ', name: '이응', word: '오리', emoji: '🦆', category: '기본 자음' },
+      { target: 'ㅇ', name: '이응', word: '우산', emoji: '☂️', category: '기본 자음' },
+      { target: 'ㅇ', name: '이응', word: '아기', emoji: '👶', category: '기본 자음' },
+      { target: 'ㅇ', name: '이응', word: '여우', emoji: '🦊', category: '기본 자음' },
+      { target: 'ㅈ', name: '지읒', word: '자동차', emoji: '🚗', category: '기본 자음' },
+      { target: 'ㅈ', name: '지읒', word: '자전거', emoji: '🚲', category: '기본 자음' },
+      { target: 'ㅈ', name: '지읒', word: '주스', emoji: '🧃', category: '기본 자음' },
+      { target: 'ㅈ', name: '지읒', word: '지구', emoji: '🌍', category: '기본 자음' },
+      { target: 'ㅊ', name: '치읓', word: '치즈', emoji: '🧀', category: '기본 자음' },
+      { target: 'ㅊ', name: '치읓', word: '초콜릿', emoji: '🍫', category: '기본 자음' },
+      { target: 'ㅊ', name: '치읓', word: '체리', emoji: '🍒', category: '기본 자음' },
+      { target: 'ㅊ', name: '치읓', word: '칫솔', emoji: '🪥', category: '기본 자음' },
+      { target: 'ㅋ', name: '키읔', word: '카메라', emoji: '📷', category: '기본 자음' },
+      { target: 'ㅋ', name: '키읔', word: '코알라', emoji: '🐨', category: '기본 자음' },
+      { target: 'ㅋ', name: '키읔', word: '쿠키', emoji: '🍪', category: '기본 자음' },
+      { target: 'ㅋ', name: '키읔', word: '케이크', emoji: '🎂', category: '기본 자음' },
+      { target: 'ㅌ', name: '티읕', word: '토마토', emoji: '🍅', category: '기본 자음' },
+      { target: 'ㅌ', name: '티읕', word: '트럭', emoji: '🚚', category: '기본 자음' },
+      { target: 'ㅌ', name: '티읕', word: '타코', emoji: '🌮', category: '기본 자음' },
+      { target: 'ㅌ', name: '티읕', word: '튤립', emoji: '🌷', category: '기본 자음' },
+      { target: 'ㅍ', name: '피읖', word: '포도', emoji: '🍇', category: '기본 자음' },
+      { target: 'ㅍ', name: '피읖', word: '피아노', emoji: '🎹', category: '기본 자음' },
+      { target: 'ㅍ', name: '피읖', word: '풍선', emoji: '🎈', category: '기본 자음' },
+      { target: 'ㅍ', name: '피읖', word: '판다', emoji: '🐼', category: '기본 자음' },
+      { target: 'ㅎ', name: '히읗', word: '하마', emoji: '🦛', category: '기본 자음' },
+      { target: 'ㅎ', name: '히읗', word: '호랑이', emoji: '🐯', category: '기본 자음' },
+      { target: 'ㅎ', name: '히읗', word: '해바라기', emoji: '🌻', category: '기본 자음' },
+      { target: 'ㅎ', name: '히읗', word: '헬리콥터', emoji: '🚁', category: '기본 자음' },
+
+      // 쌍자음 5개 (⇧ 쉬프트 활용)
+      { target: 'ㄲ', name: '쌍기역', word: '까마귀', emoji: '🐦‍⬛', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄲ', name: '쌍기역', word: '꿀벌', emoji: '🐝', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄲ', name: '쌍기역', word: '꽃다발', emoji: '💐', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄸ', name: '쌍디귿', word: '딸기', emoji: '🍓', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄸ', name: '쌍디귿', word: '땅콩', emoji: '🥜', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄸ', name: '쌍디귿', word: '떡', emoji: '🍡', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㄸ', name: '쌍디귿', word: '뜨개질', emoji: '🧶', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅃ', name: '쌍비읍', word: '빨래', emoji: '👕', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅃ', name: '쌍비읍', word: '빵', emoji: '🍞', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅃ', name: '쌍비읍', word: '뽀뽀', emoji: '💋', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅆ', name: '쌍시옷', word: '썰매', emoji: '🛷', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅆ', name: '쌍시옷', word: '쌍둥이', emoji: '👯', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅆ', name: '쌍시옷', word: '쓰레기통', emoji: '🗑️', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅆ', name: '쌍시옷', word: '씨름', emoji: '🤼', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅉ', name: '쌍지읒', word: '찌개', emoji: '🍲', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅉ', name: '쌍지읒', word: '짜장면', emoji: '🍜', category: '쌍자음 (⇧ 쉬프트)' },
+      { target: 'ㅉ', name: '쌍지읒', word: '짝꿍', emoji: '🤝', category: '쌍자음 (⇧ 쉬프트)' },
+
+      // 기본 모음 10개
+      { target: 'ㅏ', name: '아', word: '아기', emoji: '👶', category: '기본 모음' },
+      { target: 'ㅏ', name: '아', word: '아빠', emoji: '👨', category: '기본 모음' },
+      { target: 'ㅑ', name: '야', word: '야구공', emoji: '⚾', category: '기본 모음' },
+      { target: 'ㅑ', name: '야', word: '야자수', emoji: '🌴', category: '기본 모음' },
+      { target: 'ㅓ', name: '어', word: '어묵', emoji: '🍢', category: '기본 모음' },
+      { target: 'ㅓ', name: '어', word: '얼룩말', emoji: '🦓', category: '기본 모음' },
+      { target: 'ㅕ', name: '여', word: '여우', emoji: '🦊', category: '기본 모음' },
+      { target: 'ㅕ', name: '여', word: '연필', emoji: '✏️', category: '기본 모음' },
+      { target: 'ㅗ', name: '오', word: '오리', emoji: '🦆', category: '기본 모음' },
+      { target: 'ㅗ', name: '오', word: '오이', emoji: '🥒', category: '기본 모음' },
+      { target: 'ㅛ', name: '요', word: '요리사', emoji: '🧑‍🍳', category: '기본 모음' },
+      { target: 'ㅛ', name: '요', word: '욕조', emoji: '🛁', category: '기본 모음' },
+      { target: 'ㅜ', name: '우', word: '우산', emoji: '☂️', category: '기본 모음' },
+      { target: 'ㅜ', name: '우', word: '우유', emoji: '🥛', category: '기본 모음' },
+      { target: 'ㅠ', name: '유', word: '유령', emoji: '👻', category: '기본 모음' },
+      { target: 'ㅠ', name: '유', word: '유인', emoji: '', category: '기본 모음' },
+      { target: 'ㅡ', name: '으', word: '음표', emoji: '🎵', category: '기본 모음' },
+      { target: 'ㅡ', name: '으', word: '은하수', emoji: '🌌', category: '기본 모음' },
+      { target: 'ㅣ', name: '이', word: '이', emoji: '🦷', category: '기본 모음' },
+      { target: 'ㅣ', name: '이', word: '이사', emoji: '', category: '기본 모음' },
+
+      // 이중모음 (ㅐ, ㅒ, ㅔ, ㅖ, ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ)
+      { target: 'ㅐ', name: '애', word: '애벌레', emoji: '🐛', category: '이중모음' },
+      { target: 'ㅐ', name: '애', word: '개구리', emoji: '🐸', category: '이중모음' },
+      { target: 'ㅒ', name: '얘 (⇧+ㅐ)', word: '얘기', emoji: '💬', category: '이중모음 (⇧ 쉬프트)' },
+      { target: 'ㅔ', name: '에', word: '케이크', emoji: '🎂', category: '이중모음' },
+      { target: 'ㅔ', name: '에', word: '메뚜기', emoji: '🦗', category: '이중모음' },
+      { target: 'ㅖ', name: '예 (⇧+ㅔ)', word: '계란', emoji: '🥚', category: '이중모음 (⇧ 쉬프트)' },
+      { target: 'ㅘ', name: '와 (ㅗ+ㅏ)', word: '사과', emoji: '🍎', category: '이중모음 (ㅗ+ㅏ)' },
+      { target: 'ㅘ', name: '와 (ㅗ+ㅏ)', word: '왕관', emoji: '👑', category: '이중모음 (ㅗ+ㅏ)' },
+      { target: 'ㅘ', name: '와 (ㅗ+ㅏ)', word: '화분', emoji: '🪴', category: '이중모음 (ㅗ+ㅏ)' },
+      { target: 'ㅙ', name: '왜 (ㅗ+ㅐ)', word: '돼지', emoji: '🐷', category: '이중모음 (ㅗ+ㅐ)' },
+      { target: 'ㅚ', name: '외 (ㅗ+ㅣ)', word: '회오리', emoji: '🌪️', category: '이중모음 (ㅗ+ㅣ)' },
+      { target: 'ㅚ', name: '외 (ㅗ+ㅣ)', word: '회전목마', emoji: '🎠', category: '이중모음 (ㅗ+ㅣ)' },
+      { target: 'ㅝ', name: '워 (ㅜ+ㅓ)', word: '원숭이', emoji: '🐵', category: '이중모음 (ㅜ+ㅓ)' },
+      { target: 'ㅞ', name: '웨 (ㅜ+ㅔ)', word: '웨딩드레스', emoji: '👰', category: '이중모음 (ㅜ+ㅔ)' },
+      { target: 'ㅞ', name: '웨 (ㅜ+ㅔ)', word: '웨이터', emoji: '', category: '이중모음 (ㅜ+ㅔ)' },
+      { target: 'ㅟ', name: '위 (ㅜ+ㅣ)', word: '귀', emoji: '👂', category: '이중모음 (ㅜ+ㅣ)' },
+      { target: 'ㅢ', name: '의 (ㅡ+ㅣ)', word: '의자', emoji: '🪑', category: '이중모음 (ㅡ+ㅣ)' },
+      { target: 'ㅢ', name: '의 (ㅡ+ㅣ)', word: '의사', emoji: '👩‍⚕️', category: '이중모음 (ㅡ+ㅣ)' }
+    ];
+
+    // 모드 3: [같은 글자 찾기 (기본)] 전용 데이터 (WORD_LIST 중 첫 글자가 정확히 가~하로 시작하는 1:1 매칭 단어 56개 엄선)
+    const GANADA_CHOICES = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하'];
+
+    const SAME_WORD_LIST = [
+      // 가 (5)
+      { word: '가방', answer: '가', emoji: '🎒' },
+      { word: '가위', answer: '가', emoji: '✂️' },
+      { word: '가지', answer: '가', emoji: '🍆' },
+      { word: '가족', answer: '가', emoji: '👨‍👩‍👧' },
+      { word: '가면', answer: '가', emoji: '🎭' },
+      { word: '가재', answer: '가', emoji: '🦞' },
+      // 나 (7)
+      { word: '나비', answer: '나', emoji: '🦋' },
+      { word: '나무', answer: '나', emoji: '🌳' },
+      { word: '나팔', answer: '나', emoji: '🎺' },
+      { word: '나뭇잎', answer: '나', emoji: '🌿' },
+      { word: '나침반', answer: '나', emoji: '🧭' },
+      { word: '나무늘보', answer: '나', emoji: '🦥' },
+      { word: '나룻배', answer: '나', emoji: '🛶' },
+      // 다 (4)
+      { word: '다람쥐', answer: '다', emoji: '🐿️' },
+      { word: '다리', answer: '다', emoji: '🌉' },
+      { word: '다이아몬드', answer: '다', emoji: '💎' },
+      { word: '다트', answer: '다', emoji: '🎯' },
+      // 라 (6)
+      { word: '라디오', answer: '라', emoji: '📻' },
+      { word: '라면', answer: '라', emoji: '🍜' },
+      { word: '라임', answer: '라', emoji: '🍋‍🟩' },
+      { word: '라켓', answer: '라', emoji: '🎾' },
+      { word: '라마', answer: '라', emoji: '🦙' },
+      { word: '라벤더', answer: '라', emoji: '🪻' },
+      // 마 (5)
+      { word: '마이크', answer: '마', emoji: '🎤' },
+      { word: '마늘', answer: '마', emoji: '🧄' },
+      { word: '마스크', answer: '마', emoji: '😷' },
+      { word: '마라카스', answer: '마', emoji: '🪇' },
+      { word: '마법사', answer: '마', emoji: '🧙' },
+      // 바 (7)
+      { word: '바나나', answer: '바', emoji: '🍌' },
+      { word: '바구니', answer: '바', emoji: '🧺' },
+      { word: '바늘', answer: '바', emoji: '🪡' },
+      { word: '바이올린', answer: '바', emoji: '🎻' },
+      { word: '바지', answer: '바', emoji: '👖' },
+      { word: '바게트', answer: '바', emoji: '🥖' },
+      { word: '바퀴', answer: '바', emoji: '🛞' },
+      // 사 (6)
+      { word: '사자', answer: '사', emoji: '🦁' },
+      { word: '사과', answer: '사', emoji: '🍎' },
+      { word: '사탕', answer: '사', emoji: '🍬' },
+      { word: '사슴', answer: '사', emoji: '🦌' },
+      { word: '사다리', answer: '사', emoji: '🪜' },
+      { word: '사막', answer: '사', emoji: '🏜️' },
+      // 아 (6)
+      { word: '아이스크림', answer: '아', emoji: '🍦' },
+      { word: '아기', answer: '아', emoji: '👶' },
+      { word: '아보카도', answer: '아', emoji: '🥑' },
+      { word: '아파트', answer: '아', emoji: '🏢' },
+      { word: '아코디언', answer: '아', emoji: '🪗' },
+      { word: '아빠', answer: '아', emoji: '👨' },
+      // 자 (5)
+      { word: '자전거', answer: '자', emoji: '🚲' },
+      { word: '자동차', answer: '자', emoji: '🚗' },
+      { word: '자석', answer: '자', emoji: '🧲' },
+      { word: '자물쇠', answer: '자', emoji: '🔒' },
+      { word: '자유의 여신상', answer: '자', emoji: '🗽' },
+      // 차 (3)
+      { word: '차주전자', answer: '차', emoji: '🫖' },
+      { word: '차트', answer: '차', emoji: '📊' },
+      { word: '차단기', answer: '차', emoji: '🚧' },
+      // 카 (4)
+      { word: '카메라', answer: '카', emoji: '📷' },
+      { word: '카레', answer: '카', emoji: '🍛' },
+      { word: '카트', answer: '카', emoji: '🛒' },
+      { word: '카세트', answer: '카', emoji: '📼' },
+      // 타 (3)
+      { word: '타코', answer: '타', emoji: '🌮' },
+      { word: '타워크레인', answer: '타', emoji: '🏗️' },
+      { word: '타악기', answer: '타', emoji: '🪘' },
+      // 파 (6)
+      { word: '파인애플', answer: '파', emoji: '🍍' },
+      { word: '파도', answer: '파', emoji: '🌊' },
+      { word: '파리', answer: '파', emoji: '🪰' },
+      { word: '파라솔', answer: '파', emoji: '🏖️' },
+      { word: '파일', answer: '파', emoji: '📁' },
+      { word: '파우치', answer: '파', emoji: '👛' },
+      // 하 (5)
+      { word: '하마', answer: '하', emoji: '🦛' },
+      { word: '하트', answer: '하', emoji: '❤️' },
+      { word: '하품', answer: '하', emoji: '🥱' },
+      { word: '하키', answer: '하', emoji: '🏒' },
+      { word: '하이힐', answer: '하', emoji: '👠' }
+    ];
+
+    // 모드 7: [문장 연결하기] 앞 문장 - 뒷 문장 세트 (91개 엄선)
+    const SENTENCE_PAIRS = [
+      { id: 's1', left: '토끼가', right: '깡충깡충 뛰어요' },
+      { id: 's2', left: '아기 새가', right: '짹짹 노래해요' },
+      { id: 's3', left: '하늘에서', right: '보슬보슬 비가 와요' },
+      { id: 's4', left: '빨간 사과가', right: '아삭아삭 맛있어요' },
+      { id: 's5', left: '강아지가', right: '멍멍 신나게 짖어요' },
+      { id: 's6', left: '자동차가', right: '부릉부릉 달려요' },
+      { id: 's7', left: '개구리가', right: '개굴개굴 노래해요' },
+      { id: 's8', left: '해바라기가', right: '활짝 피었어요' },
+      { id: 's9', left: '호랑이가', right: '어흥 소리쳐요' },
+      { id: 's10', left: '예쁜 나비가', right: '훨훨 날아가요' },
+      { id: 's12', left: '파란 고래가', right: '바다에서 헤엄쳐요' },
+      { id: 's13', left: '고양이가', right: '야옹야옹 울어요' },
+      { id: 's14', left: '병아리가', right: '삐약삐약 따라가요' },
+      { id: 's15', left: '아기 돼지가', right: '꿀꿀 밥을 먹어요' },
+      { id: 's16', left: '얼룩소가', right: '음매음매 풀을 뜯어요' },
+      { id: 's17', left: '조랑말이', right: '다그닥다그닥 달려요' },
+      { id: 's20', left: '오리 가족이', right: '뒤뚱뒤뚱 걸어가요' },
+      { id: 's26', left: '꽃게가 모래밭을', right: '옆으로 걸어가요' },
+      { id: 's27', left: '문어가 다리를', right: '꿈틀꿈틀 움직여요' },
+      { id: 's29', left: '코끼리가 긴 코로', right: '물을 뿜어내요' },
+      { id: 's30', left: '기린이 긴 목으로', right: '나뭇잎을 먹어요' },
+      { id: 's32', left: '다람쥐가 도토리를', right: '볼에 가득 넣어요' },
+      { id: 's33', left: '귀여운 판다가', right: '대나무를 맛있게 먹어요' },
+      { id: 's34', left: '캥거루가 주머니에', right: '아기를 안고 뛰어요' },
+      { id: 's37', left: '커다란 곰이', right: '달콤한 꿀을 먹어요' },
+      { id: 's38', left: '여우가 숲속에서', right: '살금살금 걸어가요' },
+      { id: 's40', left: '홍학이 한 다리로', right: '물가에 서 있어요' },
+      { id: 's41', left: '칙칙폭폭 기차가', right: '철길을 따라 달려요' },
+      { id: 's42', left: '커다란 비행기가', right: '구름 위로 날아가요' },
+      { id: 's43', left: '헬리콥터 프로펠러가', right: '빙글빙글 돌아가요' },
+      { id: 's44', left: '멋진 우주 로켓이', right: '우주로 슝 날아가요' },
+      { id: 's45', left: '빨간 소방차가', right: '삐뽀삐뽀 출동해요' },
+      { id: 's46', left: '멋진 경찰차가', right: '동네를 안전하게 지켜요' },
+      { id: 's47', left: '하얀 구급차가', right: '병원으로 빨리 달려요' },
+      { id: 's49', left: '하얀 돛단배가', right: '바람을 타고 나아가요' },
+      { id: 's50', left: '노란 유치원 버스가', right: '친구들을 태우고 가요' },
+      { id: 's52', left: '노란 초승달이', right: '밤하늘에 떠 있어요' },
+      { id: 's54', left: '일곱 빛깔 무지개가', right: '하늘에 걸렸어요' },
+      { id: 's55', left: '하얀 눈송이가', right: '송이송이 내려와요' },
+      { id: 's56', left: '시원한 바람이', right: '솔솔 불어와요' },
+      { id: 's57', left: '번쩍번쩍 번개가', right: '우르릉 쾅쾅 쳐요' },
+      { id: 's58', left: '푸른 바다 파도가', right: '철썩철썩 밀려와요' },
+      { id: 's59', left: '따뜻한 봄이 오면', right: '분홍 꽃이 피어나요' },
+      { id: 's60', left: '선선한 가을에는', right: '단풍잎이 빨갛게 물들어요' },
+      { id: 's61', left: '시원한 수박을', right: '서걱서걱 잘라 먹어요' },
+      { id: 's64', left: '보라색 포도가', right: '송이송이 열렸어요' },
+      { id: 's66', left: '새콤달콤 귤을', right: '하나씩 까먹어요' },
+      { id: 's67', left: '노란 옥수수가', right: '알알이 박혀 있어요' },
+      { id: 's68', left: '따끈따끈 고구마를', right: '호호 불며 먹어요' },
+      { id: 's69', left: '차가운 아이스크림이', right: '사르르 입에서 녹아요' },
+      { id: 's70', left: '생일 케이크 촛불을', right: '후 불어서 꺼요' },
+      { id: 's71', left: '고소한 팝콘이', right: '톡톡 튀어 올라요' },
+      { id: 's74', left: '밖에서 놀고 오면', right: '손을 씻어야 해요' },
+      { id: 's75', left: '밤이 깊어지면', right: '쿨쿨 잠을 자요' },
+      { id: 's76', left: '자명종 시계가', right: '따르릉 아침을 알려요' },
+      { id: 's77', left: '어깨에 가방을 메고', right: '씩씩하게 학교에 가요' },
+      { id: 's78', left: '재미있는 동화책을', right: '차근차근 읽어요' },
+      { id: 's79', left: '알록달록 크레파스로', right: '멋진 그림을 그려요' },
+      { id: 's80', left: '색종이를 가위로', right: '싹둑싹둑 오려요' },
+      { id: 's81', left: '피아노 건반을 누르면', right: '도레미파 소리가 나요' },
+      { id: 's82', left: '큰 북을 두드리면', right: '둥둥둥 소리가 울려요' },
+      { id: 's84', left: '알록달록 풍선이', right: '하늘 높이 떠올라요' },
+      { id: 's85', left: '가오리 연이 바람에', right: '둥실둥실 날아올라요' },
+      { id: 's86', left: '운동장에서 친구들과', right: '신나게 공을 차요' },
+      { id: 's87', left: '눈 덮인 언덕에서', right: '쌩쌩 눈썰매를 타요' },
+      { id: 's88', left: '바닷가 모래사장에서', right: '멋진 모래성을 쌓아요' },
+      { id: 's89', left: '비가 오는 날에는', right: '알록달록 우산을 써요' },
+      { id: 's90', left: '비가 와서 물웅덩이에', right: '노란 장화를 신고 걸어요' },
+      { id: 's91', left: '추운 겨울날에는', right: '따뜻한 장갑을 껴요' },
+      { id: 's92', left: '포근한 목도리를', right: '목에 칭칭 둘러요' },
+      { id: 's93', left: '예쁜 리본 상자를', right: '두근두근 열어 봐요' },
+      { id: 's94', left: '사진기로 가족들의', right: '찰칵 사진을 찍어요' },
+      { id: 's95', left: '할머니께 전화기로', right: '여보세요 인사해요' },
+      { id: 's96', left: '빗자루로 방 안을', right: '쓱싹쓱싹 청소해요' },
+      { id: 's97', left: '작은 화분에 물을 주면', right: '새싹이 쏙 자라나요' },
+      { id: 's98', left: '촛불이 어두운 방을', right: '환하게 밝혀 줘요' },
+      { id: 's101', left: '요리사님이 주방에서', right: '보글보글 찌개를 끓여요' },
+      { id: 's102', left: '친절한 의사 선생님이', right: '아픈 곳을 치료해 줘요' },
+      { id: 's103', left: '용감한 소방관님이', right: '뜨거운 불을 꺼 줘요' },
+      { id: 's105', left: '커다란 망원경으로', right: '밤하늘의 별을 관찰해요' },
+      { id: 's106', left: '나침반 바늘이 언제나', right: '북쪽을 가리켜요' },
+      { id: 's107', left: '말굽 자석에 클립이', right: '찰싹 달라붙어요' },
+      { id: 's108', left: '모래시계 속 모래가', right: '사르르 아래로 흘러요' },
+      { id: 's109', left: '공원 분수대에서', right: '시원한 물줄기가 솟아요' },
+      { id: 's111', left: '커다란 관람차가', right: '하늘 높이 올라가요' },
+      { id: 's113', left: '모닥불이 타오르며', right: '타닥타닥 소리를 내요' },
+      { id: 's114', left: '가을 들판에 황금 벼가', right: '고개를 숙여 익어가요' },
+      { id: 's115', left: '가시 밤송이 속에서', right: '반질반질 알밤이 나와요' },
+      { id: 's117', left: '바닷가 모래 위에서', right: '예쁜 조개껍데기를 주워요' },
+      { id: 's118', left: '반짝이는 금왕관을', right: '머리 위에 멋지게 써요' },
+      { id: 's119', left: '반가운 친구를 만나면', right: '손을 흔들며 인사해요' }
+    ];
+
+    const PRAISE_MESSAGES = [
+      { emoji: '🎉', text: '우와! 참 잘했어요!' },
+      { emoji: '⭐', text: '멋져요! 한글 박사님!' },
+      { emoji: '👏', text: '정답이에요! 최고예요!' },
+      { emoji: '🌈', text: '대단해요! 쑥쑥 자라네요!' },
+      { emoji: '💖', text: '반짝반짝! 정말 잘 찾았어요!' }
+    ];
+
+    /* ==========================================================================
+       2. 한글 두벌식 키보드 배열 및 자모 분해·실시간 유니코드 조합 테이블
+       ========================================================================== */
+    const KEYPAD_CONSONANTS = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+    const KEYPAD_VOWELS = ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ'];
+
+    // 쉬프트(Shift) 키 누름 시 변환되는 7개 자모 매핑
+    const SHIFT_KEY_MAP = {
+      'ㅂ': 'ㅃ',
+      'ㅈ': 'ㅉ',
+      'ㄷ': 'ㄸ',
+      'ㄱ': 'ㄲ',
+      'ㅅ': 'ㅆ',
+      'ㅐ': 'ㅒ',
+      'ㅔ': 'ㅖ'
+    };
+
+    // 실제 한글 두벌식 물리 키보드 4줄 배열 (59열 그리드 기준: 모든 자음·모음 키는 정확히 span 5로 100% 동일 크기, 엔터(11칸)보다 살짝 긴 우측 쉬프트(14칸) 및 우측 끝 정렬)
+    const KEYBOARD_LAYOUT_ROWS = [
+      // 0열 (상단 기능 행: ㅔ 키(47~51열) 오른쪽 위 위치인 49~59열에 지우기 백스페이스 10칸 배치)
+      [
+        { type: 'status', span: 49 },
+        { type: 'backspace', label: '지우기', span: 10 }
+      ],
+      // 1열 (좌측 1칸 여백 후 ㅂ ㅈ ㄷ ㄱ ㅅ ㅛ ㅕ ㅑ ㅐ ㅔ 10개 키 × 5칸 = 50칸 + 우측 8칸 여백)
+      [
+        { type: 'spacer', span: 1 },
+        { type: 'jamo', key: 'ㅂ', span: 5 },
+        { type: 'jamo', key: 'ㅈ', span: 5 },
+        { type: 'jamo', key: 'ㄷ', span: 5 },
+        { type: 'jamo', key: 'ㄱ', span: 5 },
+        { type: 'jamo', key: 'ㅅ', span: 5 },
+        { type: 'jamo', key: 'ㅛ', span: 5 },
+        { type: 'jamo', key: 'ㅕ', span: 5 },
+        { type: 'jamo', key: 'ㅑ', span: 5 },
+        { type: 'jamo', key: 'ㅐ', span: 5 },
+        { type: 'jamo', key: 'ㅔ', span: 5 },
+        { type: 'spacer', span: 8 }
+      ],
+      // 2열 (좌측 3칸 여백 후 ㅁ ㄴ ㅇ ㄹ ㅎ ㅗ ㅓ ㅏ ㅣ 9개 키 × 5칸 = 45칸 + 우측 엔터 11칸 = 총 59칸)
+      [
+        { type: 'spacer', span: 3 },
+        { type: 'jamo', key: 'ㅁ', span: 5 },
+        { type: 'jamo', key: 'ㄴ', span: 5 },
+        { type: 'jamo', key: 'ㅇ', span: 5 },
+        { type: 'jamo', key: 'ㄹ', span: 5 },
+        { type: 'jamo', key: 'ㅎ', span: 5 },
+        { type: 'jamo', key: 'ㅗ', span: 5 },
+        { type: 'jamo', key: 'ㅓ', span: 5 },
+        { type: 'jamo', key: 'ㅏ', span: 5 },
+        { type: 'jamo', key: 'ㅣ', span: 5 },
+        { type: 'enter', label: '엔터', span: 11 }
+      ],
+      // 3열 (좌측 쉬프트 6칸으로 줄여 ㅋ(7~11열)이 ㅁ(4~8열)과 ㄴ(9~13열) 정중앙 사이에 오도록 배치 + ㅡ 뒤 5칸 여백 + 우측 쉬프트 13칸 = 총 59칸)
+      [
+        { type: 'shift', label: '쉬프트', span: 6 },
+        { type: 'jamo', key: 'ㅋ', span: 5 },
+        { type: 'jamo', key: 'ㅌ', span: 5 },
+        { type: 'jamo', key: 'ㅊ', span: 5 },
+        { type: 'jamo', key: 'ㅍ', span: 5 },
+        { type: 'jamo', key: 'ㅠ', span: 5 },
+        { type: 'jamo', key: 'ㅜ', span: 5 },
+        { type: 'jamo', key: 'ㅡ', span: 5 },
+        { type: 'spacer', span: 5 },
+        { type: 'shift', label: '쉬프트', span: 13 }
+      ]
+    ];
+
+    // 모드 4: [글자 완성 (심화)] 전용 전체 단어 리스트 (중복 제거) 및 전체 음절 풀
+    const SAME_HARD_WORD_LIST = Array.from(
+      new Map([...WORD_LIST, ...SAME_WORD_LIST].map((item) => [item.word, { word: item.word, emoji: item.emoji }])).values()
+    );
+    const ALL_SYLLABLE_POOL = Array.from(
+      new Set([...GANADA_CHOICES, ...SAME_HARD_WORD_LIST.flatMap((item) => Array.from(item.word).filter((ch) => ch !== ' '))])
+    );
+
+    const JAMO_TTS_NAMES = {
+      'ㄱ': '기역', 'ㄲ': '쌍기역', 'ㄴ': '니은', 'ㄷ': '디귿', 'ㄸ': '쌍디귿',
+      'ㄹ': '리을', 'ㅁ': '미음', 'ㅂ': '비읍', 'ㅃ': '쌍비읍', 'ㅅ': '시옷',
+      'ㅆ': '쌍시옷', 'ㅇ': '이응', 'ㅈ': '지읒', 'ㅉ': '쌍지읒', 'ㅊ': '치읓',
+      'ㅋ': '키읔', 'ㅌ': '티읕', 'ㅍ': '피읖', 'ㅎ': '히읗',
+      'ㅏ': '아', 'ㅑ': '야', 'ㅓ': '어', 'ㅕ': '여', 'ㅗ': '오', 'ㅛ': '요',
+      'ㅜ': '우', 'ㅠ': '유', 'ㅡ': '으', 'ㅣ': '이', 'ㅐ': '애', 'ㅒ': '얘', 'ㅔ': '에', 'ㅖ': '예',
+      'ㅘ': '와', 'ㅙ': '왜', 'ㅚ': '외', 'ㅝ': '워', 'ㅞ': '웨', 'ㅟ': '위', 'ㅢ': '의'
+    };
+
+    const CHOSEONG_TABLE = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+    const JUNGSEONG_TABLE = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
+    const JONGSEONG_TABLE = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+    // 쉬프트 키로 직접 입력되는 쌍자음(ㄲ,ㄸ,ㅃ,ㅆ,ㅉ)과 이중모음(ㅒ,ㅖ)은 1타로 처리하고, 두 모음 조합 및 겹받침만 2타로 분해
+    const JUNGSEONG_DECOMPOSE = {
+      'ㅘ': ['ㅗ', 'ㅏ'],
+      'ㅙ': ['ㅗ', 'ㅐ'],
+      'ㅚ': ['ㅗ', 'ㅣ'],
+      'ㅝ': ['ㅜ', 'ㅓ'],
+      'ㅞ': ['ㅜ', 'ㅔ'],
+      'ㅟ': ['ㅜ', 'ㅣ'],
+      'ㅢ': ['ㅡ', 'ㅣ']
+    };
+
+    const JONGSEONG_DECOMPOSE = {
+      'ㄳ': ['ㄱ', 'ㅅ'],
+      'ㄵ': ['ㄴ', 'ㅈ'],
+      'ㄶ': ['ㄴ', 'ㅎ'],
+      'ㄺ': ['ㄹ', 'ㄱ'],
+      'ㄻ': ['ㄹ', 'ㅁ'],
+      'ㄼ': ['ㄹ', 'ㅂ'],
+      'ㄽ': ['ㄹ', 'ㅅ'],
+      'ㄾ': ['ㄹ', 'ㅌ'],
+      'ㄿ': ['ㄹ', 'ㅍ'],
+      'ㅀ': ['ㄹ', 'ㅎ'],
+      'ㅄ': ['ㅂ', 'ㅅ']
+    };
+
+    // 단일 자모(타이핑 기본)를 키보드 타수 배열로 분해 (예: 'ㄲ' -> ['ㄲ'], 'ㅘ' -> ['ㅗ', 'ㅏ'])
+    function decomposeSingleJamoToKeystrokes(jamo) {
+      if (JUNGSEONG_DECOMPOSE[jamo]) {
+        return [...JUNGSEONG_DECOMPOSE[jamo]];
+      }
+      return [jamo];
+    }
+
+    // 타이핑(기본)에서 입력된 자모 타수 배열을 화면 표시용 자모로 합성
+    function composeSingleJamoDisplay(strokes) {
+      if (!strokes || strokes.length === 0) return '';
+      if (strokes.length === 1) return strokes[0];
+      const compound = Object.keys(JUNGSEONG_DECOMPOSE).find((k) => {
+        const pair = JUNGSEONG_DECOMPOSE[k];
+        return pair[0] === strokes[0] && pair[1] === strokes[1];
+      });
+      return compound || strokes[strokes.length - 1];
+    }
+
+    // 한글 음절 1글자를 실제 두벌식 키보드 입력 타수 배열로 분해 (예: '쥐' -> ['ㅈ','ㅜ','ㅣ'], '끼' -> ['ㄲ','ㅣ'], '시계'의 '계' -> ['ㄱ','ㅖ'])
+    function decomposeSyllableToKeystrokes(syllable) {
+      const code = syllable.charCodeAt(0);
+      if (code < 0xAC00 || code > 0xD7A3) return [syllable];
+      const offset = code - 0xAC00;
+      const choIdx = Math.floor(offset / (21 * 28));
+      const jungIdx = Math.floor((offset % (21 * 28)) / 28);
+      const jongIdx = offset % 28;
+
+      const cho = CHOSEONG_TABLE[choIdx];
+      const jung = JUNGSEONG_TABLE[jungIdx];
+      const jong = JONGSEONG_TABLE[jongIdx];
+
+      const strokes = [cho];
+
+      if (JUNGSEONG_DECOMPOSE[jung]) {
+        strokes.push(...JUNGSEONG_DECOMPOSE[jung]);
+      } else {
+        strokes.push(jung);
+      }
+
+      if (jong) {
+        if (JONGSEONG_DECOMPOSE[jong]) {
+          strokes.push(...JONGSEONG_DECOMPOSE[jong]);
+        } else {
+          strokes.push(jong);
+        }
+      }
+      return strokes;
+    }
+
+    // 현재까지 입력된 키패드 자모 배열을 실시간으로 하나의 한글 글자로 합성하여 반환
+    function composeKeystrokesToDisplayChar(strokes) {
+      if (!strokes || strokes.length === 0) return '';
+
+      let idx = 0;
+      const cho = strokes[idx];
+      if (!KEYPAD_CONSONANTS.includes(cho)) {
+        return strokes[strokes.length - 1];
+      }
+      idx++;
+
+      // 아직 모음이 입력되지 않은 상태면 초성 자음만 반환
+      if (idx >= strokes.length) {
+        return cho;
+      }
+
+      // 중성 추출
+      let jung = strokes[idx];
+      idx++;
+
+      // 복합모음 처리 (예: ㅜ + ㅣ -> ㅟ, ㅗ + ㅏ -> ㅘ)
+      if (idx < strokes.length && KEYPAD_VOWELS.includes(strokes[idx])) {
+        const secondV = strokes[idx];
+        const compoundVowel = Object.keys(JUNGSEONG_DECOMPOSE).find((k) => {
+          const pair = JUNGSEONG_DECOMPOSE[k];
+          return pair[0] === jung && pair[1] === secondV;
+        });
+        if (compoundVowel) {
+          jung = compoundVowel;
+          idx++;
+        }
+      }
+
+      // 종성(받침) 추출
+      let jong = '';
+      if (idx < strokes.length && KEYPAD_CONSONANTS.includes(strokes[idx])) {
+        jong = strokes[idx];
+        idx++;
+        if (idx < strokes.length && KEYPAD_CONSONANTS.includes(strokes[idx])) {
+          const secondC = strokes[idx];
+          const compoundJong = Object.keys(JONGSEONG_DECOMPOSE).find((k) => {
+            const pair = JONGSEONG_DECOMPOSE[k];
+            return pair[0] === jong && pair[1] === secondC;
+          });
+          if (compoundJong) {
+            jong = compoundJong;
+            idx++;
+          }
+        }
+      }
+
+      const choIndex = CHOSEONG_TABLE.indexOf(cho);
+      const jungIndex = JUNGSEONG_TABLE.indexOf(jung);
+      const jongIndex = JONGSEONG_TABLE.indexOf(jong);
+
+      if (choIndex !== -1 && jungIndex !== -1 && jongIndex !== -1) {
+        return String.fromCharCode(0xAC00 + (choIndex * 21 + jungIndex) * 28 + jongIndex);
+      }
+      return cho;
+    }
+
+    /* ==========================================================================
+       3. 앱 전역 상태 관리
+       ========================================================================== */
+    const state = {
+      mode: 'typingbasic', // 'typingbasic' | 'word' | 'same' | 'samehard' | 'wordmatchbasic' | 'wordmatch' | 'sentencematch' | 'listen'
+      stars: Number(localStorage.getItem('hangul_stars') || 0),
+      muted: false,
+      lastSpokenText: '한글 쑥쑥 놀이터에 오신 것을 환영해요!',
+      deferredInstallPrompt: null,
+
+      // 고품질 TTS 설정 상태 (localStorage 연동)
+      tts: {
+        preset: localStorage.getItem('hangul_tts_preset') || 'teacher',
+        voiceURI: localStorage.getItem('hangul_tts_voice') || 'AUTO_BEST', // 'AUTO_BEST' | 'CLOUD_TTS' | 특정 voiceURI
+        rate: Number(localStorage.getItem('hangul_tts_rate') || 0.92),
+        pitch: Number(localStorage.getItem('hangul_tts_pitch') || 1.08),
+        prosodyBoost: true
+      },
+
+      // 키보드 Shift 상태 (누르고 있기 & 원터치 토글 모두 지원)
+      shiftHeld: false,
+      shiftSticky: false,
+      shiftUsedWhileHeld: false,
+
+      // 모드 1: 타이핑(기본) - 단일 자음·모음·쌍자음·이중모음 완성 후 엔터
+      typingbasic: {
+        index: 0,
+        currentStrokes: [],
+        readyToSubmit: false,
+        completed: false
+      },
+
+      // 모드 2: 타이핑(심화) - 낱말 완성 후 엔터
+      word: {
+        index: 0,
+        showHint: false,
+        activeSlot: 0,
+        currentStrokes: [],
+        completedSlots: [],
+        readyToSubmit: false,
+        completed: false
+      },
+
+      // 모드 3: 같은 글자 찾기 (기본: 가~하 첫 글자 맞추기)
+      same: {
+        index: 0,
+        completed: false
+      },
+
+      // 모드 4: 같은 글자 찾기 (심화: 모든 위치·모든 글자 맞추기)
+      samehard: {
+        index: 0,
+        blankIndex: 0,
+        answer: '',
+        choices: [],
+        completed: false
+      },
+
+      // 모드 5, 6, 7: 선 잇기 매칭 상태
+      matching: {
+        wordmatchbasic: {
+          pairs: [],
+          leftItems: [],
+          rightItems: [],
+          matchedIds: [],
+          selectedLeftId: null,
+          selectedRightId: null,
+          tempLine: null
+        },
+        wordmatch: {
+          pairs: [],
+          leftItems: [],
+          rightItems: [],
+          matchedIds: [],
+          selectedLeftId: null,
+          selectedRightId: null,
+          tempLine: null
+        },
+        sentencematch: {
+          pairs: [],
+          leftItems: [],
+          rightItems: [],
+          matchedIds: [],
+          selectedLeftId: null,
+          selectedRightId: null,
+          tempLine: null
+        }
+      },
+
+      // 모드 8: 소리 듣고 찾기 (1.5초 반복 타이머 전용)
+      listen: {
+        target: null,
+        options: [],
+        streak: 0,
+        answered: false,
+        repeatTimer: null
+      }
+    };
+
+    /* ==========================================================================
+       4. 사운드 엔진 (고품질 신경망 TTS 자동 탐색 + 한국어 발음·억양 보정 + 클라우드 성우 + 효과음)
+       ========================================================================== */
+    let audioCtx = null;
+    let ttsDebounceTimer = null;
+    let activeCloudAudio = null;
+    let cachedKoreanVoices = [];
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSoundEffect(type) {
+      if (state.muted) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        const now = ctx.currentTime;
+
+        if (type === 'tap') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(540, now);
+          osc.frequency.exponentialRampToValueAtTime(800, now + 0.07);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'combine') {
+          const notes = [440, 554.37, 659.25];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.045);
+            gain.gain.setValueAtTime(0.15, now + i * 0.045);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.13);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.045);
+            osc.stop(now + i * 0.045 + 0.13);
+          });
+        } else if (type === 'success') {
+          const notes = [523.25, 659.25, 783.99, 1046.5];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.085);
+            gain.gain.setValueAtTime(0.2, now + i * 0.085);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.085 + 0.24);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.085);
+            osc.stop(now + i * 0.085 + 0.24);
+          });
+        } else if (type === 'wrong') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.linearRampToValueAtTime(210, now + 0.18);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        }
+      } catch (e) {
+        // 오디오 컨텍스트 제한 시 무시
+      }
+    }
+
+    // 기기 내 설치된 한국어 음성 중 고음질 신경망(Natural/Neural/Google/Enhanced/Siri/Yuna/SunHi) 음성에 높은 점수를 부여
+    function scoreKoreanVoice(voice) {
+      if (!voice) return -1;
+      const name = (voice.name || '').toLowerCase();
+      const uri = (voice.voiceURI || '').toLowerCase();
+      let score = 10;
+
+      // 1순위: Microsoft Edge / Windows 11 Natural 신경망 음성 (성우급 품질)
+      if (name.includes('natural') || name.includes('neural') || name.includes('online')) score += 100;
+      if (name.includes('sunhi') || name.includes('injoon') || name.includes('hyunsu')) score += 60;
+
+      // 2순위: Apple iOS/iPadOS 고음질(Enhanced/Premium/Siri) 음성 (유나, 소라 등)
+      if (name.includes('premium') || name.includes('enhanced') || uri.includes('premium') || uri.includes('enhanced')) score += 90;
+      if (name.includes('siri')) score += 80;
+      if (name.includes('yuna') || name.includes('유나') || name.includes('sora') || name.includes('소라')) score += 45;
+
+      // 3순위: Chrome / Android Google 고음질 한국어 네트워크/로컬 음성
+      if (name.includes('google') && (name.includes('한국') || name.includes('korean'))) score += 75;
+      if (name.includes('samsung') && (name.includes('neural') || name.includes('female'))) score += 50;
+
+      // 구형 기계음(Heami 등)은 후순위로 배치
+      if (name.includes('heami') || name.includes('compact')) score -= 25;
+      if (!voice.localService) score += 15; // 온라인 스트리밍 신경망 음성 우대
+
+      return score;
+    }
+
+    function refreshKoreanVoices() {
+      if (!('speechSynthesis' in window)) return [];
+      const allVoices = window.speechSynthesis.getVoices() || [];
+      const koList = allVoices.filter(
+        (v) => (v.lang && v.lang.toLowerCase().includes('ko')) || (v.name && /한국|korean|yuna|sunhi|injoon|heami/i.test(v.name))
+      );
+      koList.sort((a, b) => scoreKoreanVoice(b) - scoreKoreanVoice(a));
+      cachedKoreanVoices = koList;
+      return koList;
+    }
+
+    function getBestKoreanVoice() {
+      const koVoices = cachedKoreanVoices.length > 0 ? cachedKoreanVoices : refreshKoreanVoices();
+      if (koVoices.length === 0) return null;
+
+      if (state.tts.voiceURI && state.tts.voiceURI !== 'AUTO_BEST' && state.tts.voiceURI !== 'CLOUD_TTS') {
+        const matched = koVoices.find((v) => v.voiceURI === state.tts.voiceURI || v.name === state.tts.voiceURI);
+        if (matched) return matched;
+      }
+      return koVoices[0];
+    }
+
+    // 어린이 한글 학습을 위해 기계적인 끊김을 없애고 또렷한 발음·억양으로 보정하는 함수
+    const TTS_PHONETIC_OVERRIDES = {
+      '기역': '기역.',
+      '쌍기역': '쌍기역.',
+      '니은': '니은.',
+      '디귿': '디귿.',
+      '쌍디귿': '쌍디귿.',
+      '리을': '리을.',
+      '미음': '미음.',
+      '비읍': '비읍.',
+      '쌍비읍': '쌍비읍.',
+      '시옷': '시옷.',
+      '쌍시옷': '쌍시옷.',
+      '이응': '이응.',
+      '지읒': '지읒.',
+      '쌍지읒': '쌍지읒.',
+      '치읓': '치읓.',
+      '키읔': '키읔.',
+      '티읕': '티읕.',
+      '피읖': '피읖.',
+      '히읗': '히읗.'
+    };
+
+    function formatTextForNaturalTTS(rawText) {
+      if (!rawText) return '';
+      let cleaned = String(rawText).trim();
+
+      // 자모 단독 발음일 때 끝소리가 먹히지 않도록 보정 사전 적용
+      if (TTS_PHONETIC_OVERRIDES[cleaned]) {
+        return TTS_PHONETIC_OVERRIDES[cleaned];
+      }
+
+      // '밥', '해', '달', '가', '나' 같은 1글자 단어/음절은 마침표를 붙여야 TTS가 끝모음을 명확히 발음함
+      if (cleaned.length === 1 && /[가-힣]/.test(cleaned)) {
+        return `${cleaned}.`;
+      }
+
+      // 2~5글자 단일 단어에 구두점이 없으면 마침표를 붙여 자연스러운 마무리 억양 유도
+      if (cleaned.length <= 6 && !/[.!?,~]/.test(cleaned)) {
+        return `${cleaned}.`;
+      }
+
+      return cleaned;
+    }
+
+    // 클라우드 아나운서 음성 재생 (네트워크 차단/오프라인 시 자동으로 신경망 브라우저 음성으로 폴백)
+    function playCloudTtsAudio(text, onEndCallback, fallbackFn) {
+      try {
+        if (activeCloudAudio) {
+          activeCloudAudio.pause();
+          activeCloudAudio = null;
+        }
+        const encoded = encodeURIComponent(text.replace(/\.$/, ''));
+        const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`;
+        const audio = new Audio();
+        audio.referrerPolicy = 'no-referrer';
+        audio.src = url;
+        // 클라우드 음성은 기본 속도가 약간 빠르므로 어린이에게 맞게 재생 속도 조정
+        audio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
+        activeCloudAudio = audio;
+
+        let finished = false;
+        const done = () => {
+          if (!finished) {
+            finished = true;
+            if (typeof onEndCallback === 'function') onEndCallback();
+          }
+        };
+
+        audio.onended = done;
+        audio.onerror = () => {
+          if (!finished) {
+            finished = true;
+            fallbackFn();
+          }
+        };
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            if (!finished) {
+              finished = true;
+              fallbackFn();
+            }
+          });
+        }
+      } catch (err) {
+        fallbackFn();
+      }
+    }
+
+    // 한국어 음성 합성 메인 함수 (cancel() 직후 앞글자 잘림 방지 45ms 디바운스 + 고음질 음성 자동 매칭)
+    function speakText(text, saveAsLast = true, onEndCallback = null) {
+      if (saveAsLast && text) {
+        state.lastSpokenText = text;
+      }
+      if (state.muted) {
+        if (typeof onEndCallback === 'function') {
+          setTimeout(onEndCallback, 300);
+        }
+        return;
+      }
+
+      const formattedText = formatTextForNaturalTTS(text);
+
+      // 기존 진행 중인 음성/타이머 정리
+      if (ttsDebounceTimer) {
+        clearTimeout(ttsDebounceTimer);
+        ttsDebounceTimer = null;
+      }
+      if (activeCloudAudio) {
+        activeCloudAudio.pause();
+        activeCloudAudio = null;
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+
+      const speakWithWebSpeech = () => {
+        if (!('speechSynthesis' in window)) {
+          if (typeof onEndCallback === 'function') setTimeout(onEndCallback, 300);
+          return;
+        }
+
+        // cancel() 직후 바로 speak() 호출 시 첫 음절이 잘리는 브라우저 버그 방지 (45ms 지연)
+        ttsDebounceTimer = setTimeout(() => {
+          try {
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+
+            const utter = new SpeechSynthesisUtterance(formattedText);
+            utter.lang = 'ko-KR';
+
+            const bestVoice = getBestKoreanVoice();
+            if (bestVoice) {
+              utter.voice = bestVoice;
+              utter.lang = bestVoice.lang || 'ko-KR';
+            }
+
+            // 1글자 음절이나 자모는 살짝 더 또렷하고 천천히 발음
+            const isShortChar = String(text).trim().length <= 1;
+            utter.rate = isShortChar ? Math.max(0.75, state.tts.rate - 0.06) : state.tts.rate;
+            utter.pitch = state.tts.pitch;
+            utter.volume = 1.0;
+
+            let callbackCalled = false;
+            const finishHandler = () => {
+              if (!callbackCalled && typeof onEndCallback === 'function') {
+                callbackCalled = true;
+                onEndCallback();
+              }
+            };
+
+            utter.onend = finishHandler;
+            utter.onerror = finishHandler;
+
+            window.speechSynthesis.speak(utter);
+          } catch (e) {
+            if (typeof onEndCallback === 'function') {
+              setTimeout(onEndCallback, 300);
+            }
+          }
+        }, 45);
+      };
+
+      // 클라우드 아나운서 모드 선택 시 클라우드 스트림 우선 재생 후 실패 시 Web Speech 폴백
+      if (state.tts.voiceURI === 'CLOUD_TTS') {
+        playCloudTtsAudio(formattedText, onEndCallback, speakWithWebSpeech);
+      } else {
+        speakWithWebSpeech();
+      }
+    }
+
+    // ----- 목소리(TTS) 설정 모달 제어 함수 -----
+    function saveTtsSettings() {
+      localStorage.setItem('hangul_tts_preset', state.tts.preset);
+      localStorage.setItem('hangul_tts_voice', state.tts.voiceURI);
+      localStorage.setItem('hangul_tts_rate', String(state.tts.rate));
+      localStorage.setItem('hangul_tts_pitch', String(state.tts.pitch));
+    }
+
+    function populateTtsVoiceDropdown() {
+      const selectEl = document.getElementById('tts-voice-select');
+      const badgeEl = document.getElementById('tts-voice-badge');
+      if (!selectEl) return;
+
+      const koVoices = refreshKoreanVoices();
+      selectEl.innerHTML = '';
+
+      // 1. 자동 최적 고음질 옵션
+      const autoOpt = document.createElement('option');
+      const topVoiceName = koVoices[0] ? koVoices[0].name : '기본 한국어';
+      autoOpt.value = 'AUTO_BEST';
+      autoOpt.textContent = `🌟 자동 최고음질 (${topVoiceName})`;
+      selectEl.appendChild(autoOpt);
+
+      // 2. 클라우드 아나운서 옵션
+      const cloudOpt = document.createElement('option');
+      cloudOpt.value = 'CLOUD_TTS';
+      cloudOpt.textContent = '☁️ 클라우드 아나운서 성우 (온라인 스트리밍)';
+      selectEl.appendChild(cloudOpt);
+
+      // 3. 기기 내 한국어 음성 목록
+      koVoices.forEach((v) => {
+        const opt = document.createElement('option');
+        opt.value = v.voiceURI;
+        const score = scoreKoreanVoice(v);
+        const starTag = score >= 60 ? '★ 고음질 ' : '';
+        opt.textContent = `${starTag}${v.name} (${v.lang})`;
+        selectEl.appendChild(opt);
+      });
+
+      selectEl.value = state.tts.voiceURI;
+      if (selectEl.value !== state.tts.voiceURI) {
+        selectEl.value = 'AUTO_BEST';
+      }
+
+      if (badgeEl) {
+        if (state.tts.voiceURI === 'CLOUD_TTS') {
+          badgeEl.textContent = '클라우드 성우';
+        } else {
+          const best = getBestKoreanVoice();
+          badgeEl.textContent = best && scoreKoreanVoice(best) >= 60 ? '★ 신경망 고음질' : '기기 내장 음성';
+        }
+      }
+    }
+
+    function updateTtsModalUI() {
+      populateTtsVoiceDropdown();
+
+      const rateSlider = document.getElementById('tts-rate-slider');
+      const pitchSlider = document.getElementById('tts-pitch-slider');
+      const rateLabel = document.getElementById('tts-rate-label');
+      const pitchLabel = document.getElementById('tts-pitch-label');
+
+      if (rateSlider) rateSlider.value = state.tts.rate;
+      if (pitchSlider) pitchSlider.value = state.tts.pitch;
+
+      if (rateLabel) {
+        const r = state.tts.rate;
+        const desc = r < 0.85 ? '천천히 또렷하게' : r > 1.05 ? '빠르고 경쾌하게' : '또박또박 자연스럽게';
+        rateLabel.textContent = `${r.toFixed(2)}x (${desc})`;
+      }
+      if (pitchLabel) {
+        const p = state.tts.pitch;
+        const desc = p < 0.95 ? '차분한 톤' : p > 1.15 ? '귀엽고 높은 톤' : '다정한 선생님 톤';
+        pitchLabel.textContent = `${p.toFixed(2)} (${desc})`;
+      }
+
+      const presets = ['teacher', 'kid', 'slow', 'cloud'];
+      presets.forEach((key) => {
+        const btn = document.getElementById(`preset-btn-${key}`);
+        if (!btn) return;
+        if (state.tts.preset === key) {
+          btn.className = 'kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-indigo-50 border-indigo-500 text-indigo-900 shadow-sm';
+        } else {
+          btn.className = 'kid-btn border-2 rounded-2xl p-2 text-left transition-all bg-white border-gray-200 text-gray-700 hover:bg-gray-50';
+        }
+      });
+    }
+
+    function applyTtsPreset(presetKey) {
+      playSoundEffect('tap');
+      state.tts.preset = presetKey;
+
+      if (presetKey === 'teacher') {
+        state.tts.voiceURI = 'AUTO_BEST';
+        state.tts.rate = 0.92;
+        state.tts.pitch = 1.08;
+      } else if (presetKey === 'kid') {
+        state.tts.voiceURI = 'AUTO_BEST';
+        state.tts.rate = 0.98;
+        state.tts.pitch = 1.24;
+      } else if (presetKey === 'slow') {
+        state.tts.voiceURI = 'AUTO_BEST';
+        state.tts.rate = 0.78;
+        state.tts.pitch = 1.04;
+      } else if (presetKey === 'cloud') {
+        state.tts.voiceURI = 'CLOUD_TTS';
+        state.tts.rate = 0.92;
+        state.tts.pitch = 1.05;
+      }
+
+      saveTtsSettings();
+      updateTtsModalUI();
+      testTtsVoiceSample();
+    }
+
+    function handleVoiceSelectChange(val) {
+      state.tts.voiceURI = val;
+      state.tts.preset = val === 'CLOUD_TTS' ? 'cloud' : 'custom';
+      saveTtsSettings();
+      updateTtsModalUI();
+      testTtsVoiceSample();
+    }
+
+    function handleTtsSliderChange() {
+      const rateSlider = document.getElementById('tts-rate-slider');
+      const pitchSlider = document.getElementById('tts-pitch-slider');
+      if (rateSlider) state.tts.rate = Number(rateSlider.value);
+      if (pitchSlider) state.tts.pitch = Number(pitchSlider.value);
+      state.tts.preset = 'custom';
+      saveTtsSettings();
+      updateTtsModalUI();
+    }
+
+    function testTtsVoiceSample() {
+      const samples = [
+        '안녕! 한글 쑥쑥 놀이터에서 재미있게 놀아 봐요!',
+        '예쁜 나비가 꽃밭으로 훨훨 날아가요.',
+        '기역, 니은, 디귿! 참 잘했어요!'
+      ];
+      const pick = samples[Math.floor(Math.random() * samples.length)];
+      speakText(pick, false);
+    }
+
+    function openTtsModal() {
+      playSoundEffect('tap');
+      stopListenAutoRepeat();
+      updateTtsModalUI();
+      const modal = document.getElementById('tts-settings-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeTtsModal() {
+      const modal = document.getElementById('tts-settings-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      if (state.mode === 'listen' && !state.listen.answered && state.listen.target) {
+        startListenAutoRepeat();
+      }
+    }
+
+    function replayCurrentVoice() {
+      playSoundEffect('tap');
+      if (state.mode === 'typingbasic') {
+        speakCurrentTypingBasic();
+      } else if (state.mode === 'word') {
+        speakCurrentWord();
+      } else if (state.mode === 'same') {
+        speakSameWord();
+      } else if (state.mode === 'samehard') {
+        speakSameHardWord();
+      } else if (state.mode === 'listen') {
+        speakListenPrompt();
+      } else {
+        speakText(state.lastSpokenText, false);
+      }
+    }
+
+    function toggleMute() {
+      state.muted = !state.muted;
+      const iconEl = document.getElementById('mute-icon');
+      const btnEl = document.getElementById('btn-mute-toggle');
+      if (state.muted) {
+        stopListenAutoRepeat();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        iconEl.textContent = '🔇';
+        btnEl.className = 'kid-btn flex items-center justify-center bg-gray-200 border-2 border-gray-300 text-gray-600 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm';
+      } else {
+        iconEl.textContent = '🔔';
+        btnEl.className = 'kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm';
+        playSoundEffect('tap');
+        if (state.mode === 'listen' && !state.listen.answered && state.listen.target) {
+          startListenAutoRepeat();
+        } else {
+          speakText('소리를 켰어요!', false);
+        }
+      }
+    }
+
+    /* ==========================================================================
+       5. 별 스티커 보상 & 칭찬 배너 & 꽃가루 애니메이션
+       ========================================================================== */
+    function addStarSticker(count = 1) {
+      state.stars += count;
+      localStorage.setItem('hangul_stars', String(state.stars));
+      const starEl = document.getElementById('star-count');
+      if (starEl) starEl.textContent = state.stars;
+      const btn = document.getElementById('btn-star-counter');
+      if (btn) {
+        btn.classList.remove('animate-pop');
+        void btn.offsetWidth;
+        btn.classList.add('animate-pop');
+      }
+    }
+
+    let praiseTimer = null;
+    function showPraiseBanner(customText) {
+      const item = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+      const emojiEl = document.getElementById('praise-emoji');
+      const textEl = document.getElementById('praise-text');
+      if (emojiEl) emojiEl.textContent = item.emoji;
+      if (textEl) textEl.textContent = customText || item.text;
+
+      const banner = document.getElementById('praise-banner');
+      if (!banner) return;
+      banner.classList.remove('opacity-0', 'translate-y-4');
+      banner.classList.add('opacity-100', 'translate-y-0');
+
+      if (praiseTimer) clearTimeout(praiseTimer);
+      praiseTimer = setTimeout(() => {
+        banner.classList.remove('opacity-100', 'translate-y-0');
+        banner.classList.add('opacity-0', 'translate-y-4');
+      }, 2000);
+    }
+
+    const confettiParticles = [];
+    let confettiAnimating = false;
+
+    function launchConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const colors = ['#FF8A65', '#FFD54F', '#4FC3F7', '#81C784', '#BA68C8', '#F06292'];
+      for (let i = 0; i < 50; i++) {
+        confettiParticles.push({
+          x: canvas.width * 0.5 + (Math.random() - 0.5) * 160,
+          y: canvas.height * 0.45,
+          vx: (Math.random() - 0.5) * 14,
+          vy: -Math.random() * 12 - 4,
+          size: Math.random() * 8 + 6,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 12,
+          life: 1
+        });
+      }
+
+      if (!confettiAnimating) {
+        confettiAnimating = true;
+        requestAnimationFrame(stepConfetti);
+      }
+    }
+
+    function stepConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.38;
+        p.rotation += p.vRot;
+        p.life -= 0.015;
+
+        if (p.life <= 0 || p.y > canvas.height + 30) {
+          confettiParticles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
+        ctx.restore();
+      }
+
+      if (confettiParticles.length > 0) {
+        requestAnimationFrame(stepConfetti);
+      } else {
+        confettiAnimating = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    /* ==========================================================================
+       6. 8가지 모드 전환 컨트롤러 (탭 클릭 시마다 해당 파트 문제 랜덤 셔플)
+       ========================================================================== */
+    function switchMode(newMode) {
+      playSoundEffect('tap');
+      stopListenAutoRepeat();
+      state.mode = newMode;
+      state.shiftHeld = false;
+      state.shiftSticky = false;
+
+      const tabs = {
+        typingbasic: {
+          el: document.getElementById('tab-mode-typingbasic'),
+          active: 'bg-amber-400 text-white border-amber-500',
+          inactive: 'bg-white text-amber-700 border-amber-200'
+        },
+        word: {
+          el: document.getElementById('tab-mode-word'),
+          active: 'bg-orange-400 text-white border-orange-500',
+          inactive: 'bg-white text-orange-700 border-orange-200'
+        },
+        same: {
+          el: document.getElementById('tab-mode-same'),
+          active: 'bg-sky-400 text-white border-sky-500',
+          inactive: 'bg-white text-sky-700 border-sky-200'
+        },
+        samehard: {
+          el: document.getElementById('tab-mode-samehard'),
+          active: 'bg-indigo-500 text-white border-indigo-600',
+          inactive: 'bg-white text-indigo-700 border-indigo-200'
+        },
+        wordmatchbasic: {
+          el: document.getElementById('tab-mode-wordmatchbasic'),
+          active: 'bg-teal-500 text-white border-teal-600',
+          inactive: 'bg-white text-teal-700 border-teal-200'
+        },
+        wordmatch: {
+          el: document.getElementById('tab-mode-wordmatch'),
+          active: 'bg-purple-500 text-white border-purple-600',
+          inactive: 'bg-white text-purple-700 border-purple-200'
+        },
+        sentencematch: {
+          el: document.getElementById('tab-mode-sentencematch'),
+          active: 'bg-rose-400 text-white border-rose-500',
+          inactive: 'bg-white text-rose-700 border-rose-200'
+        },
+        listen: {
+          el: document.getElementById('tab-mode-listen'),
+          active: 'bg-emerald-500 text-white border-emerald-600',
+          inactive: 'bg-white text-emerald-700 border-emerald-200'
+        }
+      };
+
+      Object.keys(tabs).forEach((key) => {
+        const tab = tabs[key];
+        const view = document.getElementById(`view-${key}`);
+        if (key === newMode) {
+          tab.el.className = `kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.active}`;
+          view.classList.remove('hidden');
+          view.classList.add('flex');
+        } else {
+          tab.el.className = `kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.inactive}`;
+          view.classList.add('hidden');
+          view.classList.remove('flex');
+        }
+      });
+
+      // 각 파트 탭을 누를 때마다 문제를 랜덤으로 새로 섞어서 출제
+      if (newMode === 'typingbasic') {
+        shuffleArray(BASIC_TYPING_LIST);
+        state.typingbasic.index = 0;
+        setupTypingBasicQuestion();
+        speakCurrentTypingBasic();
+      } else if (newMode === 'word') {
+        shuffleArray(WORD_LIST);
+        state.word.index = 0;
+        setupWordQuestion();
+        speakCurrentWord();
+      } else if (newMode === 'same') {
+        shuffleArray(SAME_WORD_LIST);
+        state.same.index = 0;
+        document.getElementById('same-guide-text').innerHTML = '아래 <strong class="text-sky-600">가 ~ 하</strong> 보기에서 알맞은 글자를 눌러 주세요!';
+        setupSameQuestion();
+        speakSameWord();
+      } else if (newMode === 'samehard') {
+        shuffleArray(SAME_HARD_WORD_LIST);
+        state.samehard.index = 0;
+        document.getElementById('samehard-guide-text').innerHTML = '아래 보기 중에서 빈칸에 들어갈 글자를 찾아 눌러 주세요!';
+        setupSameHardQuestion();
+        speakSameHardWord();
+      } else if (newMode === 'wordmatchbasic') {
+        setupMatchingGame('wordmatchbasic');
+      } else if (newMode === 'wordmatch') {
+        setupMatchingGame('wordmatch');
+      } else if (newMode === 'sentencematch') {
+        setupMatchingGame('sentencematch');
+      } else if (newMode === 'listen') {
+        setupListenQuiz();
+      }
+    }
+
+    /* ==========================================================================
+       7. 모드 1: [타이핑(기본)] & 모드 2: [타이핑(심화)] + 리얼 두벌식 키보드(Shift/Enter)
+       ========================================================================== */
+    function isShiftActive() {
+      return state.shiftHeld || state.shiftSticky;
+    }
+
+    // ----- 모드 1: 타이핑(기본) (단일 자음·모음·쌍자음·이중모음 완성) -----
+    function setupTypingBasicQuestion() {
+      state.typingbasic.currentStrokes = [];
+      state.typingbasic.readyToSubmit = false;
+      state.typingbasic.completed = false;
+      state.shiftHeld = false;
+      state.shiftSticky = false;
+      renderTypingBasicView();
+    }
+
+    function renderTypingBasicView() {
+      const item = BASIC_TYPING_LIST[state.typingbasic.index];
+      if (!item) return;
+
+      document.getElementById('typingbasic-progress').textContent = `${state.typingbasic.index + 1} / ${BASIC_TYPING_LIST.length}`;
+      document.getElementById('typingbasic-type-badge').textContent = item.category;
+      document.getElementById('typingbasic-target-display').textContent = item.target;
+      document.getElementById('typingbasic-word-display').textContent = `🔊 ${item.word} (${item.name})`;
+
+      const guideEl = document.getElementById('typingbasic-guide');
+      if (state.typingbasic.completed) {
+        guideEl.innerHTML = `🎉 우와! <strong>[${item.target}]</strong> (${item.name}) 완성!`;
+      } else if (state.typingbasic.readyToSubmit) {
+        guideEl.innerHTML = `✨ 알맞게 입력했어요! 오른쪽 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 주세요!`;
+      } else {
+        const targetStrokes = decomposeSingleJamoToKeystrokes(item.target);
+        const needShift = Object.values(SHIFT_KEY_MAP).includes(item.target);
+        if (needShift) {
+          guideEl.innerHTML = `<strong>[ ⇧ 쉬프트 ]</strong>를 누른 채로 글쇠를 눌러 <strong>[${item.target}]</strong>을 만들고 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
+        } else if (targetStrokes.length > 1) {
+          guideEl.innerHTML = `두 모음 <strong>[${targetStrokes[0]}] + [${targetStrokes[1]}]</strong>을 차례로 눌러 <strong>[${item.target}]</strong>을 만들고 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
+        } else {
+          guideEl.innerHTML = `키보드에서 <strong>[${item.target}]</strong> (${item.name}) 글쇠를 누른 뒤 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
+        }
+      }
+
+      const slotContainer = document.getElementById('typingbasic-slot-container');
+      slotContainer.innerHTML = '';
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const composed = composeSingleJamoDisplay(state.typingbasic.currentStrokes);
+
+      if (state.typingbasic.completed) {
+        btn.className = 'slot-char rounded-2xl bg-gradient-to-b from-amber-400 to-orange-400 text-white border-4 border-amber-500 shadow-md flex items-center justify-center animate-pop';
+        btn.textContent = item.target;
+      } else if (state.typingbasic.readyToSubmit) {
+        btn.className = 'slot-char rounded-2xl border-4 border-emerald-500 bg-emerald-50 ring-4 ring-emerald-200 text-emerald-700 font-bold flex items-center justify-center animate-pop';
+        btn.textContent = composed;
+      } else {
+        btn.className = 'slot-char rounded-2xl border-4 border-amber-400 bg-amber-50 ring-4 ring-amber-200/70 flex items-center justify-center relative transition-all';
+        btn.innerHTML = composed
+          ? `<span class="text-amber-700 font-bold">${composed}</span>`
+          : `<span class="text-amber-300 text-lg">?</span>`;
+      }
+      btn.onclick = () => speakCurrentTypingBasic();
+      slotContainer.appendChild(btn);
+
+      renderHangulKeypad();
+    }
+
+    function speakCurrentTypingBasic() {
+      const item = BASIC_TYPING_LIST[state.typingbasic.index];
+      if (!item) return;
+      const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
+      speakText(`${cleanName}, ${item.word}`);
+    }
+
+    function nextTypingBasicQuestion() {
+      playSoundEffect('tap');
+      state.typingbasic.index = (state.typingbasic.index + 1) % BASIC_TYPING_LIST.length;
+      if (state.typingbasic.index === 0) shuffleArray(BASIC_TYPING_LIST);
+      setupTypingBasicQuestion();
+      speakCurrentTypingBasic();
+    }
+
+    function prevTypingBasicQuestion() {
+      playSoundEffect('tap');
+      state.typingbasic.index = (state.typingbasic.index - 1 + BASIC_TYPING_LIST.length) % BASIC_TYPING_LIST.length;
+      setupTypingBasicQuestion();
+      speakCurrentTypingBasic();
+    }
+
+    // ----- 모드 2: 타이핑(심화) (단어 전체 완성 후 엔터 제출) -----
+    function setupWordQuestion() {
+      const item = WORD_LIST[state.word.index];
+      const syllables = Array.from(item.word);
+      state.word.activeSlot = 0;
+      state.word.currentStrokes = [];
+      state.word.completedSlots = syllables.map((ch) => (ch === ' ' ? ' ' : null));
+      while (state.word.activeSlot < syllables.length && syllables[state.word.activeSlot] === ' ') {
+        state.word.activeSlot += 1;
+      }
+      state.word.readyToSubmit = false;
+      state.word.completed = false;
+      state.shiftHeld = false;
+      state.shiftSticky = false;
+      renderWordView();
+    }
+
+    function renderWordView() {
+      const item = WORD_LIST[state.word.index];
+      if (!item) return;
+      const syllables = Array.from(item.word);
+
+      document.getElementById('word-progress').textContent = `${state.word.index + 1} / ${WORD_LIST.length}`;
+      document.getElementById('word-emoji').textContent = item.emoji;
+
+      // 상단 안내 메시지 (힌트 없이 현재 입력 상태 및 엔터 제출 안내)
+      const guideEl = document.getElementById('word-jamo-guide');
+      if (state.word.completed) {
+        guideEl.innerHTML = `🎉 우와! <strong>"${item.word}"</strong> 낱말을 완성했어요!`;
+      } else if (state.word.readyToSubmit) {
+        guideEl.innerHTML = `✨ 글자를 모두 채웠어요! 오른쪽 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 정답을 제출하세요!`;
+      } else {
+        guideEl.innerHTML = `소리를 잘 듣고 키보드로 글자를 만든 뒤, 끝까지 채우면 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
+      }
+
+      // 음절 슬롯 렌더링 (회색 글자 힌트 없음)
+      const slotsContainer = document.getElementById('word-slots-container');
+      slotsContainer.innerHTML = '';
+
+      syllables.forEach((char, idx) => {
+        if (char === ' ') {
+          const spacer = document.createElement('div');
+          spacer.className = 'w-2 sm:w-4 shrink-0';
+          slotsContainer.appendChild(spacer);
+          return;
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+
+        if (state.word.completedSlots[idx]) {
+          btn.className = state.word.completed
+            ? 'slot-char rounded-2xl bg-gradient-to-b from-orange-400 to-amber-400 text-white border-4 border-orange-500 shadow-md flex items-center justify-center animate-pop'
+            : 'slot-char rounded-2xl bg-emerald-50 text-emerald-700 border-4 border-emerald-400 shadow-sm flex items-center justify-center font-bold animate-pop';
+          btn.textContent = state.word.completedSlots[idx];
+          btn.onclick = () => speakText(char, false);
+        } else if (idx === state.word.activeSlot) {
+          const composingChar = composeKeystrokesToDisplayChar(state.word.currentStrokes);
+          btn.className = 'slot-char rounded-2xl border-4 border-orange-400 bg-orange-50 ring-4 ring-orange-200/70 flex items-center justify-center relative transition-all';
+          btn.innerHTML = composingChar
+            ? `<span class="text-orange-600 font-bold">${composingChar}</span>`
+            : `<span class="text-orange-300 text-lg">?</span>`;
+          btn.onclick = () => speakCurrentWord();
+        } else {
+          btn.className = 'slot-char rounded-2xl border-4 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center';
+          btn.innerHTML = `<span class="text-gray-300 text-lg">?</span>`;
+          btn.onclick = () => speakCurrentWord();
+        }
+
+        slotsContainer.appendChild(btn);
+      });
+
+      renderHangulKeypad();
+    }
+
+    // ----- 공통 리얼 한글 두벌식 키보드 렌더링 (타이핑 기본 & 타이핑 심화 공유) -----
+    function renderHangulKeypad() {
+      const containerId = state.mode === 'typingbasic' ? 'keypad-keyboard-basic' : 'keypad-keyboard';
+      const kbContainer = document.getElementById(containerId);
+      if (!kbContainer) return;
+      kbContainer.innerHTML = '';
+
+      const shiftOn = isShiftActive();
+      const enterReady =
+        (state.mode === 'typingbasic' && state.typingbasic.readyToSubmit && !state.typingbasic.completed) ||
+        (state.mode === 'word' && state.word.readyToSubmit && !state.word.completed);
+
+      KEYBOARD_LAYOUT_ROWS.forEach((rowItems) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'kb-row-grid gap-1 sm:gap-1.5';
+
+        rowItems.forEach((item) => {
+          if (item.type === 'spacer') {
+            const spacer = document.createElement('div');
+            spacer.style.gridColumn = `span ${item.span} / span ${item.span}`;
+            rowEl.appendChild(spacer);
+            return;
+          }
+
+          if (item.type === 'status') {
+            const statusEl = document.createElement('div');
+            statusEl.style.gridColumn = `span ${item.span} / span ${item.span}`;
+            statusEl.className = 'flex items-center gap-2 px-2 text-[11px] sm:text-xs text-slate-700 select-none';
+            statusEl.innerHTML = `
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 border border-white"></span>자음(파랑)</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-white"></span>모음(노랑)</span>
+              <span class="hidden sm:inline text-purple-700 font-bold">${shiftOn ? '⚡ 쉬프트 켜짐 (ㅃㅉㄸㄲㅆㅒㅖ)' : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누르세요'}</span>
+            `;
+            rowEl.appendChild(statusEl);
+            return;
+          }
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.style.gridColumn = `span ${item.span} / span ${item.span}`;
+
+          if (item.type === 'backspace') {
+            btn.className = 'keycap-base keycap-action py-1 sm:py-2 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold';
+            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⌫</span><span class="relative z-10">${item.label}</span>`;
+            btn.onclick = () => handleKeypadBackspace();
+          } else if (item.type === 'enter') {
+            btn.className = `keycap-base keycap-enter ${enterReady ? 'keycap-enter-ready' : ''} py-1.5 sm:py-2.5 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold`;
+            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⏎</span><span class="relative z-10">${item.label}</span>`;
+            btn.onclick = () => handleKeypadEnter(btn);
+          } else if (item.type === 'shift') {
+            btn.className = `keycap-base keycap-shift ${shiftOn ? 'keycap-shift-active' : ''} py-1.5 sm:py-2.5 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold`;
+            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⇧</span><span class="relative z-10">${item.label}</span>`;
+
+            // 멀티터치 홀드(누른 채로 입력) 및 원터치 토글 모두 지원
+            btn.addEventListener('pointerdown', (e) => {
+              e.preventDefault();
+              playSoundEffect('tap');
+              if (state.shiftSticky && !state.shiftHeld) {
+                state.shiftSticky = false;
+                state.shiftHeld = false;
+                state.shiftUsedWhileHeld = true;
+              } else {
+                state.shiftHeld = true;
+                state.shiftUsedWhileHeld = false;
+              }
+              renderHangulKeypad();
+            });
+
+            const releaseShift = (e) => {
+              e.preventDefault();
+              if (state.shiftHeld) {
+                state.shiftHeld = false;
+                if (!state.shiftUsedWhileHeld) {
+                  // 다른 키를 누르지 않고 쉬프트만 톡 눌렀다 뗀 경우 다음 1글자 입력까지 쉬프트 유지
+                  state.shiftSticky = true;
+                }
+                renderHangulKeypad();
+              }
+            };
+            btn.addEventListener('pointerup', releaseShift);
+            btn.addEventListener('pointercancel', releaseShift);
+          } else {
+            const displayKey = shiftOn && SHIFT_KEY_MAP[item.key] ? SHIFT_KEY_MAP[item.key] : item.key;
+            const isConsonant = KEYPAD_CONSONANTS.includes(displayKey);
+            btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-1.5 sm:py-2.5 flex items-center justify-center font-bold`;
+            btn.innerHTML = `<span class="relative z-10">${displayKey}</span>`;
+            btn.addEventListener('pointerdown', (e) => {
+              e.preventDefault();
+              handleKeypadInput(displayKey, btn);
+            });
+          }
+
+          rowEl.appendChild(btn);
+        });
+
+        kbContainer.appendChild(rowEl);
+      });
+    }
+
+    function consumeShiftAfterStroke() {
+      if (state.shiftHeld) {
+        state.shiftUsedWhileHeld = true;
+      }
+      if (state.shiftSticky) {
+        state.shiftSticky = false;
+      }
+    }
+
+    function handleKeypadInput(jamo, btnEl) {
+      // 모드 1: 타이핑(기본) 입력 처리
+      if (state.mode === 'typingbasic') {
+        if (state.typingbasic.completed || state.typingbasic.readyToSubmit) {
+          playSoundEffect('wrong');
+          return;
+        }
+        const item = BASIC_TYPING_LIST[state.typingbasic.index];
+        if (!item) return;
+
+        const targetStrokes = decomposeSingleJamoToKeystrokes(item.target);
+        const expectedStroke = targetStrokes[state.typingbasic.currentStrokes.length];
+
+        if (jamo === expectedStroke) {
+          playSoundEffect('combine');
+          state.typingbasic.currentStrokes.push(jamo);
+          consumeShiftAfterStroke();
+
+          if (state.typingbasic.currentStrokes.length === targetStrokes.length) {
+            state.typingbasic.readyToSubmit = true;
+            renderTypingBasicView();
+            const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
+            speakText(cleanName, false);
+          } else {
+            renderTypingBasicView();
+            const jamoName = JAMO_TTS_NAMES[jamo] || jamo;
+            speakText(jamoName, false);
+          }
+        } else {
+          playSoundEffect('wrong');
+          if (btnEl) {
+            btnEl.classList.remove('animate-shake');
+            void btnEl.offsetWidth;
+            btnEl.classList.add('animate-shake');
+          }
+        }
+        return;
+      }
+
+      // 모드 2: 타이핑(심화) 입력 처리
+      if (state.word.completed || state.word.readyToSubmit) {
+        playSoundEffect('wrong');
+        return;
+      }
+
+      const item = WORD_LIST[state.word.index];
+      const syllables = Array.from(item.word);
+      const targetSyllable = syllables[state.word.activeSlot];
+      if (!targetSyllable) return;
+
+      const targetStrokes = decomposeSyllableToKeystrokes(targetSyllable);
+      const expectedStroke = targetStrokes[state.word.currentStrokes.length];
+
+      if (jamo === expectedStroke) {
+        playSoundEffect('combine');
+        state.word.currentStrokes.push(jamo);
+        consumeShiftAfterStroke();
+
+        // 현재 음절의 모든 자모가 완성되었는지 확인
+        if (state.word.currentStrokes.length === targetStrokes.length) {
+          state.word.completedSlots[state.word.activeSlot] = targetSyllable;
+          state.word.currentStrokes = [];
+          state.word.activeSlot += 1;
+          while (state.word.activeSlot < syllables.length && syllables[state.word.activeSlot] === ' ') {
+            state.word.activeSlot += 1;
+          }
+
+          // 전체 단어가 모두 채워졌으면 엔터(⏎) 입력 대기 상태로 전환
+          if (state.word.activeSlot >= syllables.length) {
+            state.word.readyToSubmit = true;
+            renderWordView();
+            speakText(targetSyllable, false);
+          } else {
+            renderWordView();
+            speakText(targetSyllable, false);
+          }
+        } else {
+          renderWordView();
+          const jamoName = JAMO_TTS_NAMES[jamo] || jamo;
+          speakText(jamoName, false);
+        }
+      } else {
+        playSoundEffect('wrong');
+        if (btnEl) {
+          btnEl.classList.remove('animate-shake');
+          void btnEl.offsetWidth;
+          btnEl.classList.add('animate-shake');
+        }
+      }
+    }
+
+    function handleKeypadEnter(btnEl) {
+      if (state.mode === 'typingbasic') {
+        if (state.typingbasic.completed) return;
+        if (!state.typingbasic.readyToSubmit) {
+          playSoundEffect('wrong');
+          if (btnEl) {
+            btnEl.classList.remove('animate-shake');
+            void btnEl.offsetWidth;
+            btnEl.classList.add('animate-shake');
+          }
+          return;
+        }
+        const item = BASIC_TYPING_LIST[state.typingbasic.index];
+        state.typingbasic.completed = true;
+        state.typingbasic.readyToSubmit = false;
+        renderTypingBasicView();
+        addStarSticker(1);
+        playSoundEffect('success');
+        launchConfetti();
+        const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
+        showPraiseBanner(`[${item.target}] ${item.word} 완성! 참 잘했어요!`);
+        speakText(`${cleanName}! ${item.word}!`, false);
+
+        setTimeout(() => {
+          if (state.mode === 'typingbasic' && state.typingbasic.completed) {
+            nextTypingBasicQuestion();
+          }
+        }, 2000);
+        return;
+      }
+
+      if (state.mode === 'word') {
+        if (state.word.completed) return;
+        if (!state.word.readyToSubmit) {
+          playSoundEffect('wrong');
+          if (btnEl) {
+            btnEl.classList.remove('animate-shake');
+            void btnEl.offsetWidth;
+            btnEl.classList.add('animate-shake');
+          }
+          return;
+        }
+        const item = WORD_LIST[state.word.index];
+        state.word.completed = true;
+        state.word.readyToSubmit = false;
+        renderWordView();
+        addStarSticker(1);
+        playSoundEffect('success');
+        launchConfetti();
+        showPraiseBanner(`"${item.word}" 완성! 참 잘했어요!`);
+        speakText(`${item.word}!`, false);
+
+        setTimeout(() => {
+          if (state.mode === 'word' && state.word.completed) {
+            nextWordQuestion();
+          }
+        }, 2200);
+      }
+    }
+
+    function handleKeypadBackspace() {
+      playSoundEffect('tap');
+      if (state.mode === 'typingbasic') {
+        if (state.typingbasic.completed) return;
+        if (state.typingbasic.currentStrokes.length > 0) {
+          state.typingbasic.currentStrokes.pop();
+          state.typingbasic.readyToSubmit = false;
+          renderTypingBasicView();
+        }
+        return;
+      }
+
+      if (state.word.completed) return;
+      const item = WORD_LIST[state.word.index];
+      const syllables = Array.from(item.word);
+      if (state.word.readyToSubmit) {
+        state.word.readyToSubmit = false;
+        state.word.activeSlot -= 1;
+        while (state.word.activeSlot > 0 && syllables[state.word.activeSlot] === ' ') {
+          state.word.activeSlot -= 1;
+        }
+        state.word.completedSlots[state.word.activeSlot] = null;
+        state.word.currentStrokes = [];
+        renderWordView();
+      } else if (state.word.currentStrokes.length > 0) {
+        state.word.currentStrokes.pop();
+        renderWordView();
+      } else if (state.word.activeSlot > 0) {
+        state.word.activeSlot -= 1;
+        while (state.word.activeSlot > 0 && syllables[state.word.activeSlot] === ' ') {
+          state.word.activeSlot -= 1;
+        }
+        state.word.completedSlots[state.word.activeSlot] = null;
+        state.word.currentStrokes = [];
+        renderWordView();
+      }
+    }
+
+    // 실제 물리 키보드 Shift / Enter / Backspace 연동 지원
+    window.addEventListener('keydown', (e) => {
+      if (state.mode !== 'typingbasic' && state.mode !== 'word') return;
+      if (e.key === 'Shift' && !state.shiftHeld) {
+        state.shiftHeld = true;
+        state.shiftUsedWhileHeld = false;
+        renderHangulKeypad();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleKeypadEnter(null);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleKeypadBackspace();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'Shift' && state.shiftHeld) {
+        state.shiftHeld = false;
+        renderHangulKeypad();
+      }
+    });
+
+    function speakCurrentWord() {
+      const item = WORD_LIST[state.word.index];
+      if (item) speakText(item.word);
+    }
+
+    function nextWordQuestion() {
+      playSoundEffect('tap');
+      state.word.index = (state.word.index + 1) % WORD_LIST.length;
+      if (state.word.index === 0) shuffleArray(WORD_LIST);
+      setupWordQuestion();
+      speakCurrentWord();
+    }
+
+    function prevWordQuestion() {
+      playSoundEffect('tap');
+      state.word.index = (state.word.index - 1 + WORD_LIST.length) % WORD_LIST.length;
+      setupWordQuestion();
+      speakCurrentWord();
+    }
+
+    /* ==========================================================================
+       8. 모드 2: [같은 글자 찾기 (기본)] & [같은 글자 찾기 (심화)]
+       ========================================================================== */
+    function setupSameQuestion() {
+      state.same.completed = false;
+      renderSameView();
+    }
+
+    function renderSameView() {
+      const item = SAME_WORD_LIST[state.same.index];
+      const syllables = Array.from(item.word);
+
+      document.getElementById('same-progress').textContent = `${state.same.index + 1} / ${SAME_WORD_LIST.length}`;
+      document.getElementById('same-emoji').textContent = item.emoji;
+
+      // 상단 문제 슬롯: 첫 글자는 [ ? ] 빈칸, 나머지 글자는 표시 (예: [ ? ] [ 람 ] [ 쥐 ])
+      const slotsEl = document.getElementById('same-slots-container');
+      slotsEl.innerHTML = '';
+
+      syllables.forEach((char, idx) => {
+        if (char === ' ') {
+          const spacer = document.createElement('div');
+          spacer.className = 'w-2 sm:w-4 shrink-0';
+          slotsEl.appendChild(spacer);
+          return;
+        }
+        const box = document.createElement('div');
+        if (idx === 0) {
+          if (state.same.completed) {
+            box.className = 'slot-char rounded-2xl bg-gradient-to-b from-sky-400 to-blue-500 text-white border-4 border-sky-600 shadow-md flex items-center justify-center animate-pop';
+            box.textContent = char;
+          } else {
+            box.className = 'slot-char rounded-2xl border-4 border-dashed border-sky-400 bg-sky-50 ring-4 ring-sky-200/70 text-sky-500 flex items-center justify-center font-bold';
+            box.textContent = '?';
+          }
+        } else {
+          box.className = 'slot-char rounded-2xl bg-gray-100 border-4 border-gray-300 text-gray-800 flex items-center justify-center';
+          box.textContent = char;
+        }
+        slotsEl.appendChild(box);
+      });
+
+      // 하단 가 ~ 하 14개 버튼 렌더링
+      const gridEl = document.getElementById('same-choices-grid');
+      gridEl.innerHTML = '';
+
+      GANADA_CHOICES.forEach((choiceChar) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const isCorrectPicked = state.same.completed && choiceChar === item.answer;
+
+        btn.className = isCorrectPicked
+          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-sky-500 text-white border-2 border-sky-600 py-2 sm:py-3 flex items-center justify-center'
+          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-sky-50 text-sky-900 border-2 border-sky-300 py-2 sm:py-3 flex items-center justify-center';
+        btn.textContent = choiceChar;
+        btn.onclick = () => handleSameChoiceClick(choiceChar, btn);
+        gridEl.appendChild(btn);
+      });
+    }
+
+    function handleSameChoiceClick(choiceChar, btnEl) {
+      if (state.same.completed) return;
+
+      const item = SAME_WORD_LIST[state.same.index];
+      if (choiceChar === item.answer) {
+        state.same.completed = true;
+        playSoundEffect('success');
+        addStarSticker(1);
+        launchConfetti();
+        renderSameView();
+
+        document.getElementById('same-guide-text').innerHTML = `🎉 정답이에요! <strong>"${item.answer}"</strong> → <strong>"${item.word}"</strong>!`;
+        showPraiseBanner(`[${item.answer}] - ${item.word}! 참 잘했어요!`);
+        speakText(`${item.word}!`, false);
+
+        setTimeout(() => {
+          if (state.mode === 'same' && state.same.completed) {
+            nextSameQuestion();
+          }
+        }, 2200);
+      } else {
+        playSoundEffect('wrong');
+        speakText(choiceChar, false);
+        btnEl.classList.remove('animate-shake');
+        void btnEl.offsetWidth;
+        btnEl.classList.add('animate-shake');
+      }
+    }
+
+    function speakSameWord() {
+      const item = SAME_WORD_LIST[state.same.index];
+      if (item) speakText(item.word);
+    }
+
+    function nextSameQuestion() {
+      playSoundEffect('tap');
+      state.same.index = (state.same.index + 1) % SAME_WORD_LIST.length;
+      if (state.same.index === 0) shuffleArray(SAME_WORD_LIST);
+      document.getElementById('same-guide-text').innerHTML = '아래 <strong class="text-sky-600">가 ~ 하</strong> 보기에서 알맞은 글자를 눌러 주세요!';
+      setupSameQuestion();
+      speakSameWord();
+    }
+
+    function prevSameQuestion() {
+      playSoundEffect('tap');
+      state.same.index = (state.same.index - 1 + SAME_WORD_LIST.length) % SAME_WORD_LIST.length;
+      document.getElementById('same-guide-text').innerHTML = '아래 <strong class="text-sky-600">가 ~ 하</strong> 보기에서 알맞은 글자를 눌러 주세요!';
+      setupSameQuestion();
+      speakSameWord();
+    }
+
+    // [글자 완성 (심화)] - 위치 제약 없이 어떤 글자든 출제 & 하단 14개 보기 중 선택
+    function setupSameHardQuestion() {
+      const item = SAME_HARD_WORD_LIST[state.samehard.index];
+      const syllables = Array.from(item.word);
+      const validIndices = syllables.map((ch, idx) => (ch !== ' ' ? idx : -1)).filter((idx) => idx !== -1);
+      const blankIndex = validIndices[Math.floor(Math.random() * validIndices.length)];
+      const answer = syllables[blankIndex];
+
+      const distractors = ALL_SYLLABLE_POOL.filter((ch) => ch !== answer);
+      shuffleArray(distractors);
+      const choices = shuffleArray([answer, ...distractors.slice(0, 13)]);
+
+      state.samehard.blankIndex = blankIndex;
+      state.samehard.answer = answer;
+      state.samehard.choices = choices;
+      state.samehard.completed = false;
+      renderSameHardView();
+    }
+
+    function renderSameHardView() {
+      const item = SAME_HARD_WORD_LIST[state.samehard.index];
+      const syllables = Array.from(item.word);
+
+      document.getElementById('samehard-progress').textContent = `${state.samehard.index + 1} / ${SAME_HARD_WORD_LIST.length}`;
+      document.getElementById('samehard-emoji').textContent = item.emoji;
+
+      const slotsEl = document.getElementById('samehard-slots-container');
+      slotsEl.innerHTML = '';
+
+      syllables.forEach((char, idx) => {
+        if (char === ' ') {
+          const spacer = document.createElement('div');
+          spacer.className = 'w-2 sm:w-4 shrink-0';
+          slotsEl.appendChild(spacer);
+          return;
+        }
+        const box = document.createElement('div');
+        if (idx === state.samehard.blankIndex) {
+          if (state.samehard.completed) {
+            box.className = 'slot-char rounded-2xl bg-gradient-to-b from-indigo-400 to-purple-500 text-white border-4 border-indigo-600 shadow-md flex items-center justify-center animate-pop';
+            box.textContent = char;
+          } else {
+            box.className = 'slot-char rounded-2xl border-4 border-dashed border-indigo-400 bg-indigo-50 ring-4 ring-indigo-200/70 text-indigo-500 flex items-center justify-center font-bold';
+            box.textContent = '?';
+          }
+        } else {
+          box.className = 'slot-char rounded-2xl bg-gray-100 border-4 border-gray-300 text-gray-800 flex items-center justify-center';
+          box.textContent = char;
+        }
+        slotsEl.appendChild(box);
+      });
+
+      const gridEl = document.getElementById('samehard-choices-grid');
+      gridEl.innerHTML = '';
+
+      state.samehard.choices.forEach((choiceChar) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const isCorrectPicked = state.samehard.completed && choiceChar === state.samehard.answer;
+
+        btn.className = isCorrectPicked
+          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-indigo-500 text-white border-2 border-indigo-600 py-2 sm:py-3 flex items-center justify-center'
+          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-indigo-50 text-indigo-900 border-2 border-indigo-300 py-2 sm:py-3 flex items-center justify-center';
+        btn.textContent = choiceChar;
+        btn.onclick = () => handleSameHardChoiceClick(choiceChar, btn);
+        gridEl.appendChild(btn);
+      });
+    }
+
+    function handleSameHardChoiceClick(choiceChar, btnEl) {
+      if (state.samehard.completed) return;
+
+      const item = SAME_HARD_WORD_LIST[state.samehard.index];
+      const answer = state.samehard.answer;
+
+      if (choiceChar === answer) {
+        state.samehard.completed = true;
+        playSoundEffect('success');
+        addStarSticker(1);
+        launchConfetti();
+        renderSameHardView();
+
+        document.getElementById('samehard-guide-text').innerHTML = `🎉 정답이에요! <strong>"${answer}"</strong> → <strong>"${item.word}"</strong>!`;
+        showPraiseBanner(`[${answer}] - ${item.word}! 참 잘했어요!`);
+        speakText(`${item.word}!`, false);
+
+        setTimeout(() => {
+          if (state.mode === 'samehard' && state.samehard.completed) {
+            nextSameHardQuestion();
+          }
+        }, 2200);
+      } else {
+        playSoundEffect('wrong');
+        speakText(choiceChar, false);
+        btnEl.classList.remove('animate-shake');
+        void btnEl.offsetWidth;
+        btnEl.classList.add('animate-shake');
+      }
+    }
+
+    function speakSameHardWord() {
+      const item = SAME_HARD_WORD_LIST[state.samehard.index];
+      if (item) speakText(item.word);
+    }
+
+    function nextSameHardQuestion() {
+      playSoundEffect('tap');
+      state.samehard.index = (state.samehard.index + 1) % SAME_HARD_WORD_LIST.length;
+      if (state.samehard.index === 0) shuffleArray(SAME_HARD_WORD_LIST);
+      document.getElementById('samehard-guide-text').innerHTML = '아래 보기 중에서 빈칸에 들어갈 글자를 찾아 눌러 주세요!';
+      setupSameHardQuestion();
+      speakSameHardWord();
+    }
+
+    function prevSameHardQuestion() {
+      playSoundEffect('tap');
+      state.samehard.index = (state.samehard.index - 1 + SAME_HARD_WORD_LIST.length) % SAME_HARD_WORD_LIST.length;
+      document.getElementById('samehard-guide-text').innerHTML = '아래 보기 중에서 빈칸에 들어갈 글자를 찾아 눌러 주세요!';
+      setupSameHardQuestion();
+      speakSameHardWord();
+    }
+
+    /* ==========================================================================
+       9. 모드 5, 6, 7: [단어·그림(기본: 한 글자)] & [단어·그림(심화)] & [문장 연결하기]
+       ========================================================================== */
+    let activeDrag = null; // { modeKey, side: 'left'|'right', id, startX, startY }
+
+    function setupMatchingGame(modeKey) {
+      const mState = state.matching[modeKey];
+      mState.matchedIds = [];
+      mState.selectedLeftId = null;
+      mState.selectedRightId = null;
+      mState.tempLine = null;
+
+      if (modeKey === 'wordmatchbasic') {
+        const pool = [...SINGLE_CHAR_WORD_LIST];
+        shuffleArray(pool);
+        const picked = pool.slice(0, 4).map((item, idx) => ({
+          id: `wmb-${idx}-${item.word}`,
+          leftLabel: item.word,
+          rightLabel: item.emoji,
+          speakLeft: item.word,
+          speakRight: item.word,
+          speakFull: item.word
+        }));
+        mState.pairs = picked;
+        mState.leftItems = [...picked];
+        mState.rightItems = shuffleArray([...picked]);
+      } else if (modeKey === 'wordmatch') {
+        const pool = [...WORD_LIST];
+        shuffleArray(pool);
+        const picked = pool.slice(0, 4).map((item, idx) => ({
+          id: `wm-${idx}-${item.word}`,
+          leftLabel: item.word,
+          rightLabel: item.emoji,
+          speakLeft: item.word,
+          speakRight: item.word,
+          speakFull: item.word
+        }));
+        mState.pairs = picked;
+        mState.leftItems = [...picked];
+        mState.rightItems = shuffleArray([...picked]);
+      } else {
+        const pool = [...SENTENCE_PAIRS];
+        shuffleArray(pool);
+        const picked = pool.slice(0, 4).map((item) => ({
+          id: item.id,
+          leftLabel: item.left,
+          rightLabel: item.right,
+          speakLeft: item.left,
+          speakRight: item.right,
+          speakFull: `${item.left} ${item.right}`
+        }));
+        mState.pairs = picked;
+        // 문장 연결하기에서는 왼쪽의 앞 문장 보기를 1개만 제시하고, 처음부터 선택된 상태로 시작
+        mState.leftItems = [picked[0]];
+        mState.rightItems = shuffleArray([...picked]);
+        mState.selectedLeftId = picked[0].id;
+      }
+
+      renderMatchingBoard(modeKey);
+    }
+
+    function renderMatchingBoard(modeKey) {
+      const mState = state.matching[modeKey];
+      const leftCol = document.getElementById(`left-col-${modeKey}`);
+      const rightCol = document.getElementById(`right-col-${modeKey}`);
+      leftCol.innerHTML = '';
+      rightCol.innerHTML = '';
+
+      const isWordMode = modeKey === 'wordmatch' || modeKey === 'wordmatchbasic';
+      const isBasicWord = modeKey === 'wordmatchbasic';
+      const themeBorder = isBasicWord ? 'border-teal-300' : modeKey === 'wordmatch' ? 'border-purple-300' : 'border-rose-300';
+      const activeRing = isBasicWord
+        ? 'ring-4 ring-teal-300 border-teal-500 bg-teal-50'
+        : modeKey === 'wordmatch'
+          ? 'ring-4 ring-purple-300 border-purple-500 bg-purple-50'
+          : 'ring-4 ring-rose-300 border-rose-500 bg-rose-50';
+      const dotColor = isBasicWord ? 'bg-teal-400' : modeKey === 'wordmatch' ? 'bg-purple-400' : 'bg-rose-400';
+      const matchedStyle = 'bg-emerald-50 border-emerald-400 text-emerald-800 opacity-90';
+
+      // 왼쪽 컬럼 카드 생성 (문장 연결하기는 1개만 중앙에 표시)
+      mState.leftItems.forEach((item) => {
+        const isMatched = mState.matchedIds.includes(item.id);
+        const isSelected = mState.selectedLeftId === item.id;
+
+        const card = document.createElement('div');
+        card.dataset.id = item.id;
+        card.dataset.side = 'left';
+        const heightClass = modeKey === 'sentencematch' ? 'h-[24%] min-h-[3.2rem] my-auto' : 'flex-1 min-h-0';
+        card.className = `kid-btn ${heightClass} rounded-2xl border-2 px-2.5 sm:px-4 flex items-center justify-between relative cursor-pointer transition-all ${
+          isMatched ? matchedStyle : isSelected ? activeRing : `bg-white ${themeBorder}`
+        }`;
+
+        if (isWordMode) {
+          card.innerHTML = `
+            <span class="${isBasicWord ? 'text-2xl sm:text-4xl font-bold' : 'text-lg sm:text-3xl'} text-gray-800 mx-auto truncate">${item.leftLabel}</span>
+            <span data-dot="left-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+              isMatched ? 'bg-emerald-500' : dotColor
+            } border-2 border-white shadow shrink-0 -mr-1"></span>
+          `;
+        } else {
+          card.innerHTML = `
+            <span class="text-sm sm:text-xl text-gray-800 truncate pr-2">${item.leftLabel}</span>
+            <span data-dot="left-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+              isMatched ? 'bg-emerald-500' : dotColor
+            } border-2 border-white shadow shrink-0 -mr-1"></span>
+          `;
+        }
+
+        card.addEventListener('pointerdown', (e) => handleMatchPointerDown(e, modeKey, 'left', item));
+        leftCol.appendChild(card);
+      });
+
+      // 오른쪽 컬럼 카드 생성
+      mState.rightItems.forEach((item) => {
+        const isMatched = mState.matchedIds.includes(item.id);
+        const isSelected = mState.selectedRightId === item.id;
+
+        const card = document.createElement('div');
+        card.dataset.id = item.id;
+        card.dataset.side = 'right';
+        card.className = `kid-btn flex-1 min-h-0 rounded-2xl border-2 px-2.5 sm:px-4 flex items-center justify-between relative cursor-pointer transition-all ${
+          isMatched ? matchedStyle : isSelected ? activeRing : `bg-white ${themeBorder}`
+        }`;
+
+        if (isWordMode) {
+          card.innerHTML = `
+            <span data-dot="right-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+              isMatched ? 'bg-emerald-500' : dotColor
+            } border-2 border-white shadow shrink-0 -ml-1"></span>
+            <span class="text-3xl sm:text-5xl mx-auto select-none">${item.rightLabel}</span>
+          `;
+        } else {
+          card.innerHTML = `
+            <span data-dot="right-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+              isMatched ? 'bg-emerald-500' : dotColor
+            } border-2 border-white shadow shrink-0 -ml-1"></span>
+            <span class="text-sm sm:text-xl text-gray-800 truncate pl-2 text-right flex-1">${item.rightLabel}</span>
+          `;
+        }
+
+        card.addEventListener('pointerdown', (e) => handleMatchPointerDown(e, modeKey, 'right', item));
+        rightCol.appendChild(card);
+      });
+
+      requestAnimationFrame(() => redrawMatchingLines(modeKey));
+    }
+
+    function getDotCenter(modeKey, side, id) {
+      const board = document.getElementById(`board-${modeKey}`);
+      const dot = board.querySelector(`[data-dot="${side}-${id}"]`);
+      if (!board || !dot) return { x: 0, y: 0 };
+      const bRect = board.getBoundingClientRect();
+      const dRect = dot.getBoundingClientRect();
+      return {
+        x: dRect.left - bRect.left + dRect.width / 2,
+        y: dRect.top - bRect.top + dRect.height / 2
+      };
+    }
+
+    function handleMatchPointerDown(e, modeKey, side, item) {
+      e.preventDefault();
+      const mState = state.matching[modeKey];
+      if (mState.matchedIds.includes(item.id)) {
+        speakText(item.speakFull, false);
+        return;
+      }
+
+      playSoundEffect('tap');
+      speakText(side === 'left' ? item.speakLeft : item.speakRight, false);
+
+      // 탭 연결 처리: 반대편 카드가 이미 선택되어 있으면 즉시 매칭 판정
+      if (side === 'left' && mState.selectedRightId) {
+        verifyMatchingAttempt(modeKey, item.id, mState.selectedRightId);
+        return;
+      }
+      if (side === 'right' && mState.selectedLeftId) {
+        verifyMatchingAttempt(modeKey, mState.selectedLeftId, item.id);
+        return;
+      }
+
+      // 같은 편 카드 선택 토글
+      if (side === 'left') {
+        mState.selectedLeftId = item.id;
+        mState.selectedRightId = null;
+      } else {
+        mState.selectedRightId = item.id;
+        mState.selectedLeftId = null;
+      }
+      renderMatchingBoard(modeKey);
+
+      // 드래그 시작 설정
+      const startPt = getDotCenter(modeKey, side, item.id);
+      activeDrag = {
+        modeKey,
+        side,
+        id: item.id,
+        startX: startPt.x,
+        startY: startPt.y,
+        currX: startPt.x,
+        currY: startPt.y
+      };
+    }
+
+    window.addEventListener('pointermove', (e) => {
+      if (!activeDrag) return;
+      const board = document.getElementById(`board-${activeDrag.modeKey}`);
+      if (!board) return;
+      const bRect = board.getBoundingClientRect();
+      activeDrag.currX = e.clientX - bRect.left;
+      activeDrag.currY = e.clientY - bRect.top;
+      redrawMatchingLines(activeDrag.modeKey);
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!activeDrag) return;
+      const { modeKey, side, id } = activeDrag;
+      activeDrag = null;
+
+      // 손을 뗀 위치에 반대편 카드가 있는지 확인
+      const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+      const cardEl = targetEl ? targetEl.closest('[data-side]') : null;
+
+      if (cardEl && cardEl.dataset.side && cardEl.dataset.side !== side) {
+        const otherId = cardEl.dataset.id;
+        const leftId = side === 'left' ? id : otherId;
+        const rightId = side === 'right' ? id : otherId;
+        verifyMatchingAttempt(modeKey, leftId, rightId);
+      } else {
+        redrawMatchingLines(modeKey);
+      }
+    });
+
+    function verifyMatchingAttempt(modeKey, leftId, rightId) {
+      const mState = state.matching[modeKey];
+      mState.selectedLeftId = null;
+      mState.selectedRightId = null;
+
+      if (leftId === rightId) {
+        // 정답 연결!
+        if (!mState.matchedIds.includes(leftId)) {
+          mState.matchedIds.push(leftId);
+        }
+        playSoundEffect('combine');
+        renderMatchingBoard(modeKey);
+
+        const pairObj = mState.pairs.find((p) => p.id === leftId);
+        if (pairObj) {
+          speakText(pairObj.speakFull);
+        }
+
+        // 모든 왼쪽 문제 연결 완료 시 축하 및 다음 라운드 (단어·그림은 4개, 문장 연결은 1개)
+        if (mState.matchedIds.length === mState.leftItems.length) {
+          addStarSticker(1);
+          playSoundEffect('success');
+          launchConfetti();
+          showPraiseBanner(modeKey === 'sentencematch' ? '문장을 바르게 완성했어요! 최고예요!' : '모두 바르게 연결했어요! 최고예요!');
+          setTimeout(() => {
+            if (state.mode === modeKey) {
+              setupMatchingGame(modeKey);
+            }
+          }, 2500);
+        }
+      } else {
+        // 오답 연결 시 빨간 점선 표시 후 흔들림 피드백 (문장 연결하기는 왼쪽 1개 항목 선택 상태 유지)
+        if (modeKey === 'sentencematch' && mState.leftItems.length === 1) {
+          mState.selectedLeftId = mState.leftItems[0].id;
+        }
+        playSoundEffect('wrong');
+        const p1 = getDotCenter(modeKey, 'left', leftId);
+        const p2 = getDotCenter(modeKey, 'right', rightId);
+        mState.tempLine = { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, wrong: true };
+        renderMatchingBoard(modeKey);
+
+        setTimeout(() => {
+          mState.tempLine = null;
+          redrawMatchingLines(modeKey);
+        }, 450);
+      }
+    }
+
+    function redrawMatchingLines(modeKey) {
+      const svg = document.getElementById(`svg-${modeKey}`);
+      if (!svg) return;
+      svg.innerHTML = '';
+
+      const mState = state.matching[modeKey];
+      const strokeColors = ['#FF8A65', '#4FC3F7', '#81C784', '#BA68C8'];
+
+      // 이미 완성된 정답 선 그리기
+      mState.matchedIds.forEach((id, idx) => {
+        const p1 = getDotCenter(modeKey, 'left', id);
+        const p2 = getDotCenter(modeKey, 'right', id);
+        const color = strokeColors[idx % strokeColors.length];
+        svg.appendChild(createSvgCurve(p1.x, p1.y, p2.x, p2.y, color, false));
+      });
+
+      // 드래그 중인 임시 선 그리기
+      if (activeDrag && activeDrag.modeKey === modeKey) {
+        svg.appendChild(
+          createSvgCurve(activeDrag.startX, activeDrag.startY, activeDrag.currX, activeDrag.currY, '#F59E0B', true)
+        );
+      }
+
+      // 오답 피드백 선 그리기
+      if (mState.tempLine) {
+        svg.appendChild(
+          createSvgCurve(mState.tempLine.x1, mState.tempLine.y1, mState.tempLine.x2, mState.tempLine.y2, '#EF4444', true)
+        );
+      }
+    }
+
+    function createSvgCurve(x1, y1, x2, y2, color, dashed) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const dx = Math.abs(x2 - x1) * 0.45;
+      const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', '6');
+      path.setAttribute('stroke-linecap', 'round');
+      if (dashed) {
+        path.setAttribute('stroke-dasharray', '10,8');
+      }
+      return path;
+    }
+
+    window.addEventListener('resize', () => {
+      if (state.mode === 'wordmatchbasic' || state.mode === 'wordmatch' || state.mode === 'sentencematch') {
+        requestAnimationFrame(() => redrawMatchingLines(state.mode));
+      }
+    });
+
+    /* ==========================================================================
+       10. 모드 5: [소리 듣고 찾기] (정답 숨김 & 1.5초 간격 단어 음성만 자동 반복)
+       ========================================================================== */
+    function stopListenAutoRepeat() {
+      if (state.listen.repeatTimer) {
+        clearTimeout(state.listen.repeatTimer);
+        state.listen.repeatTimer = null;
+      }
+    }
+
+    function startListenAutoRepeat() {
+      stopListenAutoRepeat();
+      if (state.mode !== 'listen' || state.listen.answered || !state.listen.target) return;
+
+      // 소리 듣고 찾기 모드에서만 정답 단어를 발음하고, 끝난 시점으로부터 1.5초 뒤에 다시 발음
+      speakText(state.listen.target.word, true, () => {
+        stopListenAutoRepeat();
+        if (state.mode === 'listen' && !state.listen.answered && state.listen.target) {
+          state.listen.repeatTimer = setTimeout(() => {
+            if (state.mode === 'listen' && !state.listen.answered) {
+              startListenAutoRepeat();
+            }
+          }, 1500);
+        }
+      });
+    }
+
+    function setupListenQuiz() {
+      stopListenAutoRepeat();
+      state.listen.answered = false;
+
+      const pool = [...WORD_LIST];
+      shuffleArray(pool);
+      const options = pool.slice(0, 4);
+      const target = options[Math.floor(Math.random() * options.length)];
+
+      state.listen.options = options;
+      state.listen.target = target;
+
+      // 안내 문구에 정답이 절대 노출되지 않도록 고정 문구 표시
+      document.getElementById('listen-prompt-text').textContent = '적절한 카드를 찾아 눌러 보세요!';
+
+      const grid = document.getElementById('listen-cards-grid');
+      grid.innerHTML = '';
+
+      const cardColors = [
+        'border-orange-200 hover:border-orange-400 bg-white',
+        'border-sky-200 hover:border-sky-400 bg-white',
+        'border-amber-200 hover:border-amber-400 bg-white',
+        'border-purple-200 hover:border-purple-400 bg-white'
+      ];
+
+      options.forEach((item, idx) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `kid-btn card-shadow rounded-3xl border-4 ${cardColors[idx % cardColors.length]} p-2 sm:p-4 flex flex-col items-center justify-center transition-all overflow-hidden`;
+        card.innerHTML = `
+          <div class="text-2xl sm:text-5xl font-bold text-gray-800 tracking-wide">${item.word}</div>
+        `;
+        card.onclick = () => handleListenCardClick(item, card);
+        grid.appendChild(card);
+      });
+
+      startListenAutoRepeat();
+    }
+
+    function speakListenPrompt() {
+      if (!state.listen.target) return;
+      startListenAutoRepeat();
+    }
+
+    function handleListenCardClick(selectedItem, cardElement) {
+      if (state.listen.answered) return;
+
+      const target = state.listen.target;
+      if (selectedItem.word === target.word) {
+        state.listen.answered = true;
+        stopListenAutoRepeat();
+
+        state.listen.streak += 1;
+        document.getElementById('listen-streak-badge').textContent = `연속 정답: ${state.listen.streak}`;
+
+        addStarSticker(1);
+        playSoundEffect('success');
+        launchConfetti();
+
+        cardElement.className = 'kid-btn card-shadow rounded-3xl border-4 border-emerald-500 bg-emerald-50 p-2 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 animate-pop';
+        showPraiseBanner(`"${target.word}" 정답이에요! 참 잘했어요!`);
+        speakText(`${target.word}!`, false);
+
+        setTimeout(() => {
+          if (state.mode === 'listen') {
+            setupListenQuiz();
+          }
+        }, 2200);
+      } else {
+        state.listen.streak = 0;
+        document.getElementById('listen-streak-badge').textContent = `연속 정답: 0`;
+        playSoundEffect('wrong');
+
+        cardElement.classList.remove('animate-shake');
+        void cardElement.offsetWidth;
+        cardElement.classList.add('animate-shake');
+      }
+    }
+
+    /* ==========================================================================
+       11. 유틸리티 & PWA 설치 / 서비스 워커 등록 (updateViaCache: 'none')
+       ========================================================================== */
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      state.deferredInstallPrompt = e;
+      const installBtn = document.getElementById('btn-install-pwa');
+      if (installBtn) {
+        installBtn.classList.add('animate-bounce');
+        setTimeout(() => installBtn.classList.remove('animate-bounce'), 3000);
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      state.deferredInstallPrompt = null;
+      showPraiseBanner('앱이 홈 화면에 설치되었어요! 📲');
+    });
+
+    async function handleInstallClick() {
+      playSoundEffect('tap');
+      if (state.deferredInstallPrompt) {
+        state.deferredInstallPrompt.prompt();
+        const { outcome } = await state.deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          state.deferredInstallPrompt = null;
+        }
+      } else {
+        const modal = document.getElementById('install-guide-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeInstallModal() {
+      const modal = document.getElementById('install-guide-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function openPwaModal() {
+      playSoundEffect('tap');
+      document.getElementById('pre-manifest').textContent = MANIFEST_JSON_CONTENT;
+      document.getElementById('pre-sw').textContent = SW_JS_CONTENT;
+      document.getElementById('copy-status-msg').textContent = '';
+
+      const modal = document.getElementById('pwa-files-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePwaModal() {
+      const modal = document.getElementById('pwa-files-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function copyPwaFile(type) {
+      const text = type === 'manifest' ? MANIFEST_JSON_CONTENT : SW_JS_CONTENT;
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      const msgEl = document.getElementById('copy-status-msg');
+      msgEl.textContent = `✅ ${type === 'manifest' ? 'manifest.json' : 'sw.js'} 코드가 클립보드에 복사되었습니다!`;
+    }
+
+    function downloadPwaFile(filename, content, mimeType) {
+      const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      const msgEl = document.getElementById('copy-status-msg');
+      msgEl.textContent = `⬇️ ${filename} 파일 다운로드를 시작했습니다!`;
+    }
+
+    function registerServiceWorker() {
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('./sw.js', { updateViaCache: 'none' })
+            .then((registration) => {
+              registration.update();
+            })
+            .catch(() => {});
+        });
+      }
+    }
+
+    /* ==========================================================================
+       12. 초기 실행
+       ========================================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('star-count').textContent = state.stars;
+
+      if ('speechSynthesis' in window) {
+        refreshKoreanVoices();
+        window.speechSynthesis.onvoiceschanged = () => {
+          refreshKoreanVoices();
+          const modal = document.getElementById('tts-settings-modal');
+          if (modal && !modal.classList.contains('hidden')) {
+            updateTtsModalUI();
+          }
+        };
+      }
+
+      let lastTouchEnd = 0;
+      document.addEventListener(
+        'touchend',
+        (event) => {
+          const now = Date.now();
+          if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        },
+        { passive: false }
+      );
+
+      // 시작 시 모든 파트의 문제 순서를 랜덤으로 섞기
+      shuffleArray(BASIC_TYPING_LIST);
+      shuffleArray(WORD_LIST);
+      shuffleArray(SINGLE_CHAR_WORD_LIST);
+      shuffleArray(SAME_WORD_LIST);
+      shuffleArray(SAME_HARD_WORD_LIST);
+
+      // 초기 모드 데이터 세팅
+      setupTypingBasicQuestion();
+      setupWordQuestion();
+      setupSameQuestion();
+      setupSameHardQuestion();
+      setupMatchingGame('wordmatchbasic');
+      setupMatchingGame('wordmatch');
+      setupMatchingGame('sentencematch');
+      speakCurrentTypingBasic();
+      registerServiceWorker();
+    });
+  </script>
+</body>
+</html>
