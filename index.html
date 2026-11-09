@@ -57,9 +57,8 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
       position: fixed;
       inset: 0;
@@ -67,26 +66,48 @@
       font-family: 'Jua', 'Noto Sans KR', sans-serif;
       color: #374151;
       overscroll-behavior: none;
+      touch-action: none;
     }
 
-    /* 전체 앱 컨테이너: 안전영역(Notch/Home Indicator) 반영 */
-    #app-shell {
+    /* 뷰포트 전체 고정 스테이지: 태블릿·모바일에서 PC 레이아웃을 비율대로 중앙 축소 배치 */
+    #viewport-stage {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding-top: max(0.35rem, var(--safe-top));
-      padding-bottom: max(0.35rem, var(--safe-bottom));
-      padding-left: max(0.45rem, var(--safe-left));
-      padding-right: max(0.45rem, var(--safe-right));
+      align-items: center;
+      justify-content: center;
       overflow: hidden;
-      position: relative;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      padding-left: var(--safe-left);
+      padding-right: var(--safe-right);
       background:
         radial-gradient(circle at 12% 15%, rgba(255, 213, 79, 0.25) 0%, transparent 28%),
         radial-gradient(circle at 88% 20%, rgba(79, 195, 247, 0.22) 0%, transparent 30%),
         radial-gradient(circle at 50% 90%, rgba(255, 138, 101, 0.18) 0%, transparent 35%),
         #FFF9F0;
+    }
+
+    /* 전체 앱 컨테이너: PC 기준 해상도 레이아웃을 유지하며 화면 크기에 맞춰 자동 스케일링 */
+    #app-shell {
+      width: 1120px;
+      height: 740px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0.5rem 0.65rem;
+      overflow: hidden;
+      position: relative;
+      transform-origin: center center;
+      will-change: transform;
+      flex-shrink: 0;
+    }
+
+    .modal-scroll-area {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* ==========================================================================
@@ -238,53 +259,35 @@
     }
 
     /* ==========================================================================
-       3. 화면 크기별 자동 반응형 타이포그래피 & 카드 크기 조절 (clamp)
+       3. PC 기준 고정 타이포그래피 & 카드 크기 (뷰포트 스케일러가 비율 축소 담당)
        ========================================================================== */
     .title-text {
-      font-size: clamp(0.95rem, 2.3vmin, 1.4rem);
+      font-size: 1.35rem;
     }
     .tab-text {
-      font-size: clamp(0.68rem, 1.75vmin, 1.05rem);
+      font-size: 0.98rem;
     }
     .emoji-hero {
-      font-size: clamp(2.6rem, 10.5vmin, 5.4rem);
+      font-size: 4.8rem;
       line-height: 1.05;
     }
     .slot-char {
-      font-size: clamp(1.35rem, 4.8vmin, 2.6rem);
-      width: clamp(2.7rem, 9.5vmin, 4.5rem);
-      height: clamp(2.7rem, 9.5vmin, 4.5rem);
+      font-size: 2.3rem;
+      width: 4.1rem;
+      height: 4.1rem;
     }
     .keycap-text {
-      font-size: clamp(1rem, 3.2vmin, 1.65rem);
+      font-size: 1.5rem;
     }
     .ganada-btn {
-      font-size: clamp(1.15rem, 3.8vmin, 2.1rem);
+      font-size: 1.85rem;
     }
     .quiz-emoji {
-      font-size: clamp(2rem, 8.5vmin, 4.5rem);
+      font-size: 4rem;
       line-height: 1.1;
     }
     .quiz-word {
-      font-size: clamp(1.15rem, 3.6vmin, 2rem);
-    }
-
-    /* 가로 높이가 낮은 스마트폰 가로모드(Landscape) 최적화 */
-    @media (max-height: 500px) {
-      .emoji-hero {
-        font-size: clamp(2rem, 9.5vh, 3.2rem);
-      }
-      .slot-char {
-        width: clamp(2.2rem, 9.5vh, 3.1rem);
-        height: clamp(2.2rem, 9.5vh, 3.1rem);
-        font-size: clamp(1.1rem, 5vh, 1.6rem);
-      }
-      .keycap-text {
-        font-size: clamp(0.85rem, 4vh, 1.25rem);
-      }
-      .compact-hide {
-        display: none !important;
-      }
+      font-size: 1.85rem;
     }
   </style>
 </head>
@@ -292,23 +295,25 @@
   <!-- 꽃가루 축하 이펙트 캔버스 -->
   <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
 
-  <!-- 메인 앱 영역 (100dvh 고정, 스크롤 없음) -->
-  <div id="app-shell" class="max-w-6xl mx-auto">
+  <!-- 뷰포트 자동 배율 스테이지 (PC 화면 구성을 모든 기기에서 비율 유지하며 표시) -->
+  <div id="viewport-stage">
+  <!-- 메인 앱 영역 (PC 기준 레이아웃 고정, 스크롤 없음) -->
+  <div id="app-shell">
 
     <!-- ========================================================================
          상단 헤더: 로고, 별 스티커, 소리 컨트롤, 앱 설치 버튼, PWA 파일 도우미
          ======================================================================== -->
-    <header class="flex items-center justify-between gap-1.5 sm:gap-2 px-2 py-1 bg-white/90 backdrop-blur rounded-2xl border-2 border-orange-200 shadow-sm shrink-0">
+    <header class="flex items-center justify-between gap-2 px-3 py-1.5 bg-white/90 backdrop-blur rounded-2xl border-2 border-orange-200 shadow-sm shrink-0">
       <!-- 앱 아이콘 & 타이틀 -->
-      <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
-        <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-orange-400 to-amber-300 flex items-center justify-center shadow-inner shrink-0 overflow-hidden border border-orange-300">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-400 to-amber-300 flex items-center justify-center shadow-inner shrink-0 overflow-hidden border border-orange-300">
           <img
             src="./icon.png"
             alt="아이콘"
             class="w-full h-full object-cover"
             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
           />
-          <span style="display:none;" class="w-full h-full items-center justify-center text-white text-base sm:text-lg font-bold">가</span>
+          <span style="display:none;" class="w-full h-full items-center justify-center text-white text-lg font-bold">가</span>
         </div>
         <div class="truncate">
           <h1 class="title-text font-normal text-orange-600 tracking-wide truncate leading-tight">한글 쑥쑥 놀이터</h1>
@@ -316,12 +321,12 @@
       </div>
 
       <!-- 우측 상태 및 도구 버튼 그룹 -->
-      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      <div class="flex items-center gap-1.5 shrink-0">
         <!-- 별 스티커 카운터 -->
         <button
           id="btn-star-counter"
           onclick="speakText(`별 스티커를 ${state.stars}개 모았어요!`, false)"
-          class="kid-btn flex items-center gap-1 bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 text-amber-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          class="kid-btn flex items-center gap-1 bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 text-amber-800 px-2.5 py-1 rounded-xl text-sm"
           title="모은 별 스티커"
         >
           <span>⭐</span>
@@ -332,29 +337,29 @@
         <button
           id="btn-replay-voice"
           onclick="replayCurrentVoice()"
-          class="kid-btn flex items-center gap-1 bg-sky-100 hover:bg-sky-200 border-2 border-sky-300 text-sky-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          class="kid-btn flex items-center gap-1 bg-sky-100 hover:bg-sky-200 border-2 border-sky-300 text-sky-800 px-2.5 py-1 rounded-xl text-sm"
           title="다시 듣기"
         >
           <span>🔊</span>
-          <span class="hidden sm:inline">다시 듣기</span>
+          <span>다시 듣기</span>
         </button>
 
         <!-- 목소리(TTS) 설정 버튼 -->
         <button
           id="btn-tts-settings"
           onclick="openTtsModal()"
-          class="kid-btn flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 border-2 border-indigo-300 text-indigo-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          class="kid-btn flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 border-2 border-indigo-300 text-indigo-800 px-2.5 py-1 rounded-xl text-sm"
           title="목소리 종류·속도·억양 설정"
         >
           <span>🎙️</span>
-          <span class="hidden sm:inline">목소리</span>
+          <span>목소리</span>
         </button>
 
         <!-- 음소거 토글 버튼 -->
         <button
           id="btn-mute-toggle"
           onclick="toggleMute()"
-          class="kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm"
+          class="kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-8 h-8 rounded-xl text-sm"
           title="소리 켜기/끄기"
           aria-label="소리 켜기/끄기"
         >
@@ -365,7 +370,7 @@
         <button
           id="btn-install-pwa"
           onclick="handleInstallClick()"
-          class="kid-btn flex items-center gap-1 bg-gradient-to-r from-orange-400 to-rose-400 hover:from-orange-500 hover:to-rose-500 text-white border-2 border-orange-500 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm shadow-sm"
+          class="kid-btn flex items-center gap-1 bg-gradient-to-r from-orange-400 to-rose-400 hover:from-orange-500 hover:to-rose-500 text-white border-2 border-orange-500 px-2.5 py-1 rounded-xl text-sm shadow-sm"
           title="태블릿/휴대폰에 앱 설치하기"
         >
           <span>📲</span>
@@ -375,23 +380,23 @@
         <!-- 깃허브 배포용 manifest.json / sw.js 다운로드 버튼 -->
         <button
           onclick="openPwaModal()"
-          class="kid-btn flex items-center gap-1 bg-purple-100 hover:bg-purple-200 border-2 border-purple-300 text-purple-800 px-2 py-0.5 sm:py-1 rounded-xl text-xs sm:text-sm"
+          class="kid-btn flex items-center gap-1 bg-purple-100 hover:bg-purple-200 border-2 border-purple-300 text-purple-800 px-2.5 py-1 rounded-xl text-sm"
           title="깃허브 업로드용 manifest.json 및 sw.js 파일 받기"
         >
           <span>📁</span>
-          <span class="hidden md:inline">PWA 파일</span>
+          <span>PWA 파일</span>
         </button>
       </div>
     </header>
 
     <!-- ========================================================================
-         상단 8가지 한글 놀이 모드 전환 탭
+         상단 8가지 한글 놀이 모드 전환 탭 (PC 기준 8열 일렬 배치 고정)
          ======================================================================== -->
-    <nav class="grid grid-cols-4 sm:grid-cols-8 gap-1 sm:gap-1.5 my-1 shrink-0" aria-label="놀이 모드 선택">
+    <nav class="grid grid-cols-8 gap-1.5 my-1 shrink-0" aria-label="놀이 모드 선택">
       <button
         id="tab-mode-typingbasic"
         onclick="switchMode('typingbasic')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-amber-400 text-white border-amber-500 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-amber-400 text-white border-amber-500 leading-tight"
       >
         <span>🐣</span>
         <span class="truncate">타이핑(기본)</span>
@@ -399,7 +404,7 @@
       <button
         id="tab-mode-word"
         onclick="switchMode('word')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-orange-700 border-orange-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-orange-700 border-orange-200 leading-tight"
       >
         <span>⌨️</span>
         <span class="truncate">타이핑(심화)</span>
@@ -407,7 +412,7 @@
       <button
         id="tab-mode-same"
         onclick="switchMode('same')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-sky-700 border-sky-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-sky-700 border-sky-200 leading-tight"
       >
         <span>🔤</span>
         <span class="truncate">글자 완성(기본)</span>
@@ -415,7 +420,7 @@
       <button
         id="tab-mode-samehard"
         onclick="switchMode('samehard')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-indigo-700 border-indigo-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-indigo-700 border-indigo-200 leading-tight"
       >
         <span>🧩</span>
         <span class="truncate">글자 완성(심화)</span>
@@ -423,7 +428,7 @@
       <button
         id="tab-mode-wordmatchbasic"
         onclick="switchMode('wordmatchbasic')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-teal-700 border-teal-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-teal-700 border-teal-200 leading-tight"
       >
         <span>🌱</span>
         <span class="truncate">단어·그림(기본)</span>
@@ -431,7 +436,7 @@
       <button
         id="tab-mode-wordmatch"
         onclick="switchMode('wordmatch')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-purple-700 border-purple-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-purple-700 border-purple-200 leading-tight"
       >
         <span>🔗</span>
         <span class="truncate">단어·그림(심화)</span>
@@ -439,7 +444,7 @@
       <button
         id="tab-mode-sentencematch"
         onclick="switchMode('sentencematch')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-rose-700 border-rose-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-rose-700 border-rose-200 leading-tight"
       >
         <span>📝</span>
         <span class="truncate">문장 연결하기</span>
@@ -447,7 +452,7 @@
       <button
         id="tab-mode-listen"
         onclick="switchMode('listen')"
-        class="kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-emerald-700 border-emerald-200 leading-tight"
+        class="kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors bg-white text-emerald-700 border-emerald-200 leading-tight"
       >
         <span>🎧</span>
         <span class="truncate">소리 듣고 찾기</span>
@@ -464,25 +469,25 @@
            ====================================================================== -->
       <section id="view-typingbasic" class="w-full h-full flex flex-col justify-between gap-1.5 overflow-hidden">
         <!-- 상단 보조 컨트롤 바 -->
-        <div class="flex items-center justify-between px-2.5 py-1 bg-white/85 rounded-2xl border border-amber-200 shrink-0">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-xs shrink-0">
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-amber-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
               자모 <strong id="typingbasic-progress">1 / 120</strong>
             </span>
-            <span class="text-xs text-amber-800 truncate">
+            <span class="text-sm text-amber-800 truncate">
               자음·모음을 입력한 뒤 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 완성해 보세요! (쌍자음·ㅒ·ㅖ는 <strong>⇧ 쉬프트</strong> 활용)
             </span>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button
               onclick="prevTypingBasicQuestion()"
-              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               ◀ 이전
             </button>
             <button
               onclick="nextTypingBasicQuestion()"
-              class="kid-btn bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-800 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-800 px-2.5 py-0.5 rounded-xl text-xs"
             >
               다음 ▶
             </button>
@@ -490,36 +495,36 @@
         </div>
 
         <!-- 중앙 자모 안내 & 입력 슬롯 영역 (타이핑 심화와 동일한 레이아웃, 이모지 없음) -->
-        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-amber-200 card-shadow px-3 py-1.5 sm:p-3 flex flex-row items-center justify-evenly gap-2 sm:gap-6 relative overflow-hidden">
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-amber-200 card-shadow p-3 flex flex-row items-center justify-evenly gap-6 relative overflow-hidden">
           <!-- 왼쪽: 목표 자모 & 예시 단어 듣기 -->
           <button
             onclick="speakCurrentTypingBasic()"
-            class="kid-btn flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-amber-50 transition shrink-0"
+            class="kid-btn flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-amber-50 transition shrink-0"
             title="누르면 자모와 예시 단어를 읽어줘요"
           >
-            <span id="typingbasic-type-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs mb-0.5 compact-hide">
+            <span id="typingbasic-type-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs mb-1">
               기본 자음
             </span>
             <div id="typingbasic-target-display" class="emoji-hero font-bold text-amber-600 animate-float select-none">ㅅ</div>
-            <span id="typingbasic-word-display" class="mt-0.5 text-[11px] sm:text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+            <span id="typingbasic-word-display" class="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
               🔊 사자 (시옷)
             </span>
           </button>
 
           <!-- 오른쪽: 단일 자모 슬롯 & 안내 -->
-          <div class="flex flex-col items-center justify-center gap-1 sm:gap-2 min-w-0">
-            <div id="typingbasic-guide" class="text-xs sm:text-base text-amber-800 bg-amber-50 border border-amber-200 px-3 py-0.5 rounded-full text-center truncate max-w-full">
+          <div class="flex flex-col items-center justify-center gap-2 min-w-0">
+            <div id="typingbasic-guide" class="text-base text-amber-800 bg-amber-50 border border-amber-200 px-3.5 py-1 rounded-full text-center truncate max-w-full">
               키보드에서 알맞은 글쇠를 찾아 눌러 보세요!
             </div>
-            <div id="typingbasic-slot-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+            <div id="typingbasic-slot-container" class="flex items-center justify-center gap-3 flex-wrap">
               <!-- JS로 단일 자모 슬롯 렌더링 -->
             </div>
           </div>
         </div>
 
         <!-- 하단 리얼 한글 두벌식 키보드 하우징 UI -->
-        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-1.5 sm:p-2.5 shadow-lg shrink-0">
-          <div id="keypad-keyboard-basic" class="bg-slate-800/15 rounded-2xl p-1 sm:p-1.5 flex flex-col gap-1 sm:gap-1.5 max-w-4xl mx-auto">
+        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-2.5 shadow-lg shrink-0">
+          <div id="keypad-keyboard-basic" class="bg-slate-800/15 rounded-2xl p-1.5 flex flex-col gap-1.5 max-w-4xl mx-auto">
             <!-- JS로 두벌식 키보드 렌더링 -->
           </div>
         </div>
@@ -530,25 +535,25 @@
            ====================================================================== -->
       <section id="view-word" class="w-full h-full hidden flex-col justify-between gap-1.5 overflow-hidden">
         <!-- 상단 보조 컨트롤 바 -->
-        <div class="flex items-center justify-between px-2.5 py-1 bg-white/85 rounded-2xl border border-orange-200 shrink-0">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="bg-orange-100 text-orange-700 border border-orange-300 px-2 py-0.5 rounded-full text-xs shrink-0">
+        <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-orange-200 shrink-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bg-orange-100 text-orange-700 border border-orange-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
               낱말 <strong id="word-progress">1 / 200</strong>
             </span>
-            <span class="text-xs text-orange-700 truncate">
+            <span class="text-sm text-orange-700 truncate">
               단어를 모두 입력한 뒤 오른쪽의 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 정답을 제출하세요!
             </span>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button
               onclick="prevWordQuestion()"
-              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               ◀ 이전
             </button>
             <button
               onclick="nextWordQuestion()"
-              class="kid-btn bg-orange-100 hover:bg-orange-200 border border-orange-300 text-orange-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-orange-100 hover:bg-orange-200 border border-orange-300 text-orange-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               다음 ▶
             </button>
@@ -556,34 +561,34 @@
         </div>
 
         <!-- 중앙 그림 & 실시간 조합 글자 슬롯 영역 -->
-        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-orange-200 card-shadow px-3 py-1.5 sm:p-3 flex flex-row items-center justify-evenly gap-2 sm:gap-6 relative overflow-hidden">
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-orange-200 card-shadow p-3 flex flex-row items-center justify-evenly gap-6 relative overflow-hidden">
           <!-- 왼쪽: 그림 & 소리 듣기 -->
           <button
             onclick="speakCurrentWord()"
-            class="kid-btn flex flex-col items-center justify-center p-1 sm:p-2 rounded-2xl hover:bg-orange-50 transition shrink-0"
+            class="kid-btn flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-orange-50 transition shrink-0"
             title="누르면 단어를 읽어줘요"
           >
             <div id="word-emoji" class="emoji-hero animate-float select-none">🦋</div>
-            <span class="mt-0.5 text-[11px] sm:text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+            <span class="mt-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-full">
               🔊 단어 듣기
             </span>
           </button>
 
           <!-- 오른쪽: 음절 슬롯 & 조합 안내 -->
-          <div class="flex flex-col items-center justify-center gap-1 sm:gap-2 min-w-0">
-            <div id="word-jamo-guide" class="text-xs sm:text-base text-orange-700 bg-orange-50 border border-orange-200 px-3 py-0.5 rounded-full text-center truncate max-w-full">
+          <div class="flex flex-col items-center justify-center gap-2 min-w-0">
+            <div id="word-jamo-guide" class="text-base text-orange-700 bg-orange-50 border border-orange-200 px-3.5 py-1 rounded-full text-center truncate max-w-full">
               키보드의 자음과 모음을 눌러 글자를 완성해 보세요!
             </div>
-            <div id="word-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+            <div id="word-slots-container" class="flex items-center justify-center gap-3 flex-wrap">
               <!-- JS로 음절 슬롯 렌더링 -->
             </div>
           </div>
         </div>
 
         <!-- 하단 리얼 한글 두벌식 키보드 하우징 UI -->
-        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-1.5 sm:p-2.5 shadow-lg shrink-0">
+        <div class="bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 border-4 border-slate-400 rounded-3xl p-2.5 shadow-lg shrink-0">
           <!-- 실제 한글 두벌식 키보드 배열 컨테이너 -->
-          <div id="keypad-keyboard" class="bg-slate-800/15 rounded-2xl p-1 sm:p-1.5 flex flex-col gap-1 sm:gap-1.5 max-w-4xl mx-auto">
+          <div id="keypad-keyboard" class="bg-slate-800/15 rounded-2xl p-1.5 flex flex-col gap-1.5 max-w-4xl mx-auto">
             <!-- JS로 두벌식 키보드 렌더링 -->
           </div>
         </div>
@@ -596,23 +601,23 @@
         <!-- 상단 보조 컨트롤 바 -->
         <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-sky-200 shrink-0">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="bg-sky-100 text-sky-800 border border-sky-300 px-2.5 py-0.5 rounded-full text-xs sm:text-sm shrink-0">
+            <span class="bg-sky-100 text-sky-800 border border-sky-300 px-2.5 py-0.5 rounded-full text-sm shrink-0">
               문제 <strong id="same-progress">1 / 16</strong>
             </span>
-            <span class="text-xs sm:text-sm text-sky-700 truncate">
+            <span class="text-sm text-sky-700 truncate">
               빈칸 <strong>[ ? ]</strong>에 들어갈 첫 글자를 <strong>가~하</strong> 중에서 찾아보세요!
             </span>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button
               onclick="prevSameQuestion()"
-              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               ◀ 이전
             </button>
             <button
               onclick="nextSameQuestion()"
-              class="kid-btn bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               다음 ▶
             </button>
@@ -620,30 +625,30 @@
         </div>
 
         <!-- 중앙 문제 디스플레이: 그림 + [ ? ] 나머지 글자 -->
-        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-sky-200 card-shadow p-3 sm:p-5 flex flex-row items-center justify-evenly gap-3 sm:gap-8 overflow-hidden">
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-sky-200 card-shadow p-5 flex flex-row items-center justify-evenly gap-8 overflow-hidden">
           <button
             onclick="speakSameWord()"
             class="kid-btn flex flex-col items-center justify-center p-2 rounded-3xl hover:bg-sky-50 transition shrink-0"
           >
             <div id="same-emoji" class="emoji-hero animate-float select-none">🐿️</div>
-            <span class="mt-1 text-xs sm:text-sm text-sky-600 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
+            <span class="mt-1 text-sm text-sky-600 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-full">
               🔊 단어 듣기
             </span>
           </button>
 
           <div class="flex flex-col items-center justify-center gap-2">
-            <div id="same-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+            <div id="same-slots-container" class="flex items-center justify-center gap-3 flex-wrap">
               <!-- 예: [ ? ] [ 람 ] [ 쥐 ] -->
             </div>
-            <p id="same-guide-text" class="text-xs sm:text-base text-gray-500 text-center">
+            <p id="same-guide-text" class="text-base text-gray-500 text-center">
               아래 <strong class="text-sky-600">가 ~ 하</strong> 보기에서 알맞은 글자를 눌러 주세요!
             </p>
           </div>
         </div>
 
         <!-- 하단 보기: 가, 나, 다, 라, 마, 바, 사, 아, 자, 차, 카, 타, 파, 하 (7x2 고정 그리드) -->
-        <div class="bg-sky-100/80 border-2 border-sky-200 rounded-3xl p-2 sm:p-3 shrink-0">
-          <div id="same-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto">
+        <div class="bg-sky-100/80 border-2 border-sky-200 rounded-3xl p-3 shrink-0">
+          <div id="same-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-2.5 max-w-4xl mx-auto">
             <!-- JS로 가~하 14개 버튼 생성 -->
           </div>
         </div>
@@ -656,23 +661,23 @@
         <!-- 상단 보조 컨트롤 바 -->
         <div class="flex items-center justify-between px-3 py-1 bg-white/85 rounded-2xl border border-indigo-200 shrink-0">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-0.5 rounded-full text-xs sm:text-sm shrink-0">
+            <span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-0.5 rounded-full text-sm shrink-0">
               심화 <strong id="samehard-progress">1 / 31</strong>
             </span>
-            <span class="text-xs sm:text-sm text-indigo-700 truncate">
+            <span class="text-sm text-indigo-700 truncate">
               단어의 빈칸 <strong>[ ? ]</strong>에 들어갈 알맞은 글자를 아래 보기에서 찾아보세요!
             </span>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button
               onclick="prevSameHardQuestion()"
-              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               ◀ 이전
             </button>
             <button
               onclick="nextSameHardQuestion()"
-              class="kid-btn bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 text-indigo-700 px-2 py-0.5 rounded-xl text-xs"
+              class="kid-btn bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 text-indigo-700 px-2.5 py-0.5 rounded-xl text-xs"
             >
               다음 ▶
             </button>
@@ -680,30 +685,30 @@
         </div>
 
         <!-- 중앙 문제 디스플레이: 그림 + 임의 위치 [ ? ] 슬롯 -->
-        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-indigo-200 card-shadow p-3 sm:p-5 flex flex-row items-center justify-evenly gap-3 sm:gap-8 overflow-hidden">
+        <div class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-indigo-200 card-shadow p-5 flex flex-row items-center justify-evenly gap-8 overflow-hidden">
           <button
             onclick="speakSameHardWord()"
             class="kid-btn flex flex-col items-center justify-center p-2 rounded-3xl hover:bg-indigo-50 transition shrink-0"
           >
             <div id="samehard-emoji" class="emoji-hero animate-float select-none">🌈</div>
-            <span class="mt-1 text-xs sm:text-sm text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+            <span class="mt-1 text-sm text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
               🔊 단어 듣기
             </span>
           </button>
 
           <div class="flex flex-col items-center justify-center gap-2">
-            <div id="samehard-slots-container" class="flex items-center justify-center gap-1.5 sm:gap-3 flex-wrap">
+            <div id="samehard-slots-container" class="flex items-center justify-center gap-3 flex-wrap">
               <!-- JS로 임의 위치 [ ? ] 슬롯 렌더링 -->
             </div>
-            <p id="samehard-guide-text" class="text-xs sm:text-base text-gray-500 text-center">
+            <p id="samehard-guide-text" class="text-base text-gray-500 text-center">
               아래 보기 중에서 빈칸에 들어갈 글자를 찾아 눌러 주세요!
             </p>
           </div>
         </div>
 
         <!-- 하단 보기: 정답 글자 포함 14개 랜덤 음절 (7x2 그리드) -->
-        <div class="bg-indigo-100/80 border-2 border-indigo-200 rounded-3xl p-2 sm:p-3 shrink-0">
-          <div id="samehard-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-1.5 sm:gap-2.5 max-w-4xl mx-auto">
+        <div class="bg-indigo-100/80 border-2 border-indigo-200 rounded-3xl p-3 shrink-0">
+          <div id="samehard-choices-grid" class="grid grid-cols-7 grid-rows-2 gap-2.5 max-w-4xl mx-auto">
             <!-- JS로 14개 보기 버튼 생성 -->
           </div>
         </div>
@@ -719,7 +724,7 @@
             <span class="bg-teal-100 text-teal-800 border border-teal-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
               단어·그림(기본: 한 글자)
             </span>
-            <span class="text-xs sm:text-sm text-teal-800 truncate">
+            <span class="text-sm text-teal-800 truncate">
               왼쪽 <strong>한 글자 낱말</strong>과 오른쪽 그림을 선으로 이어 보세요!
             </span>
           </div>
@@ -734,19 +739,19 @@
         <!-- 선 잇기 보드 영역 -->
         <div
           id="board-wordmatchbasic"
-          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-teal-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-teal-200 card-shadow p-4 relative flex items-center justify-between overflow-hidden"
         >
           <!-- 연결 선 SVG 오버레이 -->
           <svg id="svg-wordmatchbasic" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
 
           <!-- 왼쪽: 한 글자 단어 카드 4개 -->
-          <div id="left-col-wordmatchbasic" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="left-col-wordmatchbasic" class="w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
 
           <!-- 중앙 여유 공간 (선 연결 영역) -->
           <div class="flex-1 h-full pointer-events-none"></div>
 
           <!-- 오른쪽: 그림 카드 4개 -->
-          <div id="right-col-wordmatchbasic" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="right-col-wordmatchbasic" class="w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
         </div>
       </section>
 
@@ -760,7 +765,7 @@
             <span class="bg-purple-100 text-purple-800 border border-purple-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
               단어·그림(심화)
             </span>
-            <span class="text-xs sm:text-sm text-purple-800 truncate">
+            <span class="text-sm text-purple-800 truncate">
               왼쪽 단어와 오른쪽 그림을 <strong>선으로 끌어 잇거나 차례대로 터치</strong>해 보세요!
             </span>
           </div>
@@ -775,19 +780,19 @@
         <!-- 선 잇기 보드 영역 -->
         <div
           id="board-wordmatch"
-          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-purple-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-purple-200 card-shadow p-4 relative flex items-center justify-between overflow-hidden"
         >
           <!-- 연결 선 SVG 오버레이 -->
           <svg id="svg-wordmatch" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
 
           <!-- 왼쪽: 단어 카드 4개 -->
-          <div id="left-col-wordmatch" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="left-col-wordmatch" class="w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
 
           <!-- 중앙 여유 공간 (선 연결 영역) -->
           <div class="flex-1 h-full pointer-events-none"></div>
 
           <!-- 오른쪽: 그림 카드 4개 -->
-          <div id="right-col-wordmatch" class="w-[38%] sm:w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="right-col-wordmatch" class="w-[34%] h-full flex flex-col justify-between gap-2 z-20"></div>
         </div>
       </section>
 
@@ -801,7 +806,7 @@
             <span class="bg-rose-100 text-rose-800 border border-rose-300 px-2.5 py-0.5 rounded-full text-xs shrink-0">
               문장 연결하기
             </span>
-            <span class="text-xs sm:text-sm text-rose-800 truncate">
+            <span class="text-sm text-rose-800 truncate">
               어울리는 앞 문장과 뒷 문장을 <strong>선으로 이어</strong> 문장을 완성해 보세요!
             </span>
           </div>
@@ -816,19 +821,19 @@
         <!-- 문장 선 잇기 보드 영역 -->
         <div
           id="board-sentencematch"
-          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-rose-200 card-shadow p-2.5 sm:p-4 relative flex items-center justify-between overflow-hidden"
+          class="flex-1 min-h-0 bg-white rounded-3xl border-4 border-rose-200 card-shadow p-4 relative flex items-center justify-between overflow-hidden"
         >
           <!-- 연결 선 SVG 오버레이 -->
           <svg id="svg-sentencematch" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
 
           <!-- 왼쪽: 앞 문장 4개 -->
-          <div id="left-col-sentencematch" class="w-[41%] sm:w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="left-col-sentencematch" class="w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
 
           <!-- 중앙 여유 공간 (선 연결 영역) -->
           <div class="flex-1 h-full pointer-events-none"></div>
 
           <!-- 오른쪽: 뒷 문장 4개 -->
-          <div id="right-col-sentencematch" class="w-[41%] sm:w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
+          <div id="right-col-sentencematch" class="w-[38%] h-full flex flex-col justify-between gap-2 z-20"></div>
         </div>
       </section>
 
@@ -837,25 +842,25 @@
            ====================================================================== -->
       <section id="view-listen" class="w-full h-full hidden flex-col justify-between gap-2 overflow-hidden">
         <!-- 상단 음성 문제 배너 (정답 단어를 표시하지 않고 안내 문구만 표시) -->
-        <div class="bg-white rounded-3xl border-4 border-emerald-200 card-shadow px-3 py-2 sm:p-3.5 flex items-center justify-between gap-2 shrink-0">
-          <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div class="bg-white rounded-3xl border-4 border-emerald-200 card-shadow p-3.5 flex items-center justify-between gap-2 shrink-0">
+          <div class="flex items-center gap-3 min-w-0">
             <button
               onclick="speakListenPrompt()"
-              class="kid-btn pill-shadow w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-xl sm:text-2xl shrink-0 border-2 border-emerald-600 animate-pulse"
+              class="kid-btn pill-shadow w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-2xl shrink-0 border-2 border-emerald-600 animate-pulse"
               title="문제 다시 듣기"
             >
               🔊
             </button>
             <div class="min-w-0">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs">
+                <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-xs">
                   🔁 1.5초 자동 반복 중
                 </span>
-                <span id="listen-streak-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] sm:text-xs">
+                <span id="listen-streak-badge" class="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-xs">
                   연속 정답: 0
                 </span>
               </div>
-              <p id="listen-prompt-text" class="text-sm sm:text-xl text-gray-800 mt-0.5 truncate">
+              <p id="listen-prompt-text" class="text-xl text-gray-800 mt-0.5 truncate">
                 적절한 카드를 찾아 눌러 보세요!
               </p>
             </div>
@@ -864,13 +869,13 @@
           <div class="flex items-center gap-1.5 shrink-0">
             <button
               onclick="speakListenPrompt()"
-              class="kid-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border-2 border-emerald-300 px-2.5 py-1.5 rounded-2xl text-xs sm:text-sm"
+              class="kid-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border-2 border-emerald-300 px-3 py-1.5 rounded-2xl text-sm"
             >
               👂 문제 다시 듣기
             </button>
             <button
               onclick="setupListenQuiz()"
-              class="kid-btn bg-gray-100 hover:bg-gray-200 text-gray-700 border-2 border-gray-300 px-2.5 py-1.5 rounded-2xl text-xs sm:text-sm"
+              class="kid-btn bg-gray-100 hover:bg-gray-200 text-gray-700 border-2 border-gray-300 px-3 py-1.5 rounded-2xl text-sm"
             >
               다른 문제 ▶
             </button>
@@ -878,7 +883,7 @@
         </div>
 
         <!-- 4지선다 큼직한 그림+낱말 카드 그리드 -->
-        <div id="listen-cards-grid" class="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-2.5 sm:gap-4">
+        <div id="listen-cards-grid" class="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-4">
           <!-- JS로 4개 카드 렌더링 -->
         </div>
       </section>
@@ -890,9 +895,9 @@
          ======================================================================== -->
     <div
       id="praise-banner"
-      class="fixed left-1/2 bottom-6 -translate-x-1/2 z-40 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-4"
+      class="absolute left-1/2 bottom-6 -translate-x-1/2 z-40 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-4"
     >
-      <div class="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-white px-6 py-3 rounded-full shadow-xl border-4 border-white flex items-center gap-2 text-lg sm:text-2xl whitespace-nowrap">
+      <div class="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-white px-6 py-3 rounded-full shadow-xl border-4 border-white flex items-center gap-2 text-2xl whitespace-nowrap">
         <span id="praise-emoji">🎉</span>
         <span id="praise-text">참 잘했어요! 최고예요!</span>
       </div>
@@ -903,7 +908,7 @@
          ======================================================================== -->
     <div
       id="install-guide-modal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4"
+      class="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 rounded-3xl"
       onclick="if(event.target === this) closeInstallModal()"
     >
       <div class="bg-white rounded-3xl border-4 border-orange-300 max-w-md w-full p-5 shadow-2xl animate-pop">
@@ -915,17 +920,17 @@
           <button onclick="closeInstallModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
         </div>
 
-        <div class="space-y-3 text-sm sm:text-base text-gray-700 font-sans">
+        <div class="space-y-3 text-base text-gray-700 font-sans">
           <div class="bg-orange-50 border border-orange-200 rounded-2xl p-3">
             <div class="font-bold text-orange-700 mb-1">🤖 안드로이드 (갤럭시 탭 / 스마트폰)</div>
-            <p class="text-xs sm:text-sm leading-relaxed">
+            <p class="text-sm leading-relaxed">
               Chrome 또는 삼성 인터넷 우측 상단 메뉴(<strong>⋮</strong> 또는 <strong>≡</strong>)를 누른 뒤 <strong>[앱 설치]</strong> 또는 <strong>[홈 화면에 추가]</strong>를 선택해 주세요.
             </p>
           </div>
 
           <div class="bg-sky-50 border border-sky-200 rounded-2xl p-3">
             <div class="font-bold text-sky-700 mb-1">🍎 아이패드 / 아이폰 (Safari)</div>
-            <p class="text-xs sm:text-sm leading-relaxed">
+            <p class="text-sm leading-relaxed">
               Safari 브라우저 상단 또는 하단의 <strong>[공유하기 📤]</strong> 버튼을 누른 뒤, 메뉴에서 <strong>[홈 화면에 추가 ➕]</strong>를 누르면 앱처럼 전체 화면으로 이용할 수 있어요!
             </p>
           </div>
@@ -947,19 +952,19 @@
          ======================================================================== -->
     <div
       id="pwa-files-modal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-5"
+      class="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-5 rounded-3xl"
       onclick="if(event.target === this) closePwaModal()"
     >
-      <div class="bg-white rounded-3xl border-4 border-purple-300 max-w-2xl w-full max-h-[90dvh] flex flex-col p-4 sm:p-5 shadow-2xl animate-pop">
+      <div class="bg-white rounded-3xl border-4 border-purple-300 max-w-2xl w-full max-h-[90%] flex flex-col p-5 shadow-2xl animate-pop">
         <div class="flex items-center justify-between border-b border-purple-100 pb-2.5 mb-3 shrink-0">
-          <h2 class="text-lg sm:text-xl text-purple-700 flex items-center gap-2">
+          <h2 class="text-xl text-purple-700 flex items-center gap-2">
             <span>📁</span>
             <span>깃허브 홈페이지용 PWA 필수 파일 (manifest.json / sw.js)</span>
           </h2>
           <button onclick="closePwaModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
         </div>
 
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 font-sans text-xs sm:text-sm text-gray-700">
+        <div class="modal-scroll-area flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 font-sans text-sm text-gray-700">
           <div class="bg-purple-50 border border-purple-200 rounded-2xl p-3">
             <p class="font-bold text-purple-800 mb-1">💡 깃허브 페이지(GitHub Pages) 저장소 폴더 구성 안내</p>
             <p class="leading-relaxed">
@@ -1034,19 +1039,19 @@
          ======================================================================== -->
     <div
       id="tts-settings-modal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-5"
+      class="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-5 rounded-3xl"
       onclick="if(event.target === this) closeTtsModal()"
     >
-      <div class="bg-white rounded-3xl border-4 border-indigo-300 max-w-lg w-full max-h-[90dvh] flex flex-col p-4 sm:p-5 shadow-2xl animate-pop">
+      <div class="bg-white rounded-3xl border-4 border-indigo-300 max-w-lg w-full max-h-[90%] flex flex-col p-5 shadow-2xl animate-pop">
         <div class="flex items-center justify-between border-b border-indigo-100 pb-2.5 mb-3 shrink-0">
-          <h2 class="text-lg sm:text-xl text-indigo-700 flex items-center gap-2">
+          <h2 class="text-xl text-indigo-700 flex items-center gap-2">
             <span>🎙️</span>
             <span>어린이 한글 목소리(TTS) 설정</span>
           </h2>
           <button onclick="closeTtsModal()" class="kid-btn w-8 h-8 rounded-full bg-gray-100 text-gray-600">✕</button>
         </div>
 
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1 font-sans text-xs sm:text-sm text-gray-700">
+        <div class="modal-scroll-area flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1 font-sans text-sm text-gray-700">
           <!-- 1. 원클릭 말투 프리셋 -->
           <div>
             <label class="block font-bold text-indigo-900 mb-1.5">✨ 추천 목소리 스타일 (원클릭 프리셋)</label>
@@ -1166,6 +1171,7 @@
       </div>
     </div>
 
+  </div>
   </div>
 
   <!-- ==========================================================================
@@ -2911,11 +2917,11 @@ self.addEventListener('fetch', (event) => {
         const tab = tabs[key];
         const view = document.getElementById(`view-${key}`);
         if (key === newMode) {
-          tab.el.className = `kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.active}`;
+          tab.el.className = `kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.active}`;
           view.classList.remove('hidden');
           view.classList.add('flex');
         } else {
-          tab.el.className = `kid-btn pill-shadow flex flex-col sm:flex-row items-center justify-center gap-0.5 py-1 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.inactive}`;
+          tab.el.className = `kid-btn pill-shadow flex flex-row items-center justify-center gap-1 py-1.5 px-1 rounded-2xl border-2 tab-text transition-colors leading-tight ${tab.inactive}`;
           view.classList.add('hidden');
           view.classList.remove('flex');
         }
@@ -3147,11 +3153,11 @@ self.addEventListener('fetch', (event) => {
           if (item.type === 'status') {
             const statusEl = document.createElement('div');
             statusEl.style.gridColumn = `span ${item.span} / span ${item.span}`;
-            statusEl.className = 'flex items-center gap-2 px-2 text-[11px] sm:text-xs text-slate-700 select-none';
+            statusEl.className = 'flex items-center gap-2 px-2 text-xs text-slate-700 select-none';
             statusEl.innerHTML = `
               <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 border border-white"></span>자음(파랑)</span>
               <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-white"></span>모음(노랑)</span>
-              <span class="hidden sm:inline text-purple-700 font-bold">${shiftOn ? '⚡ 쉬프트 켜짐 (ㅃㅉㄸㄲㅆㅒㅖ)' : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누르세요'}</span>
+              <span class="inline text-purple-700 font-bold">${shiftOn ? '⚡ 쉬프트 켜짐 (ㅃㅉㄸㄲㅆㅒㅖ)' : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누르세요'}</span>
             `;
             rowEl.appendChild(statusEl);
             return;
@@ -3162,16 +3168,16 @@ self.addEventListener('fetch', (event) => {
           btn.style.gridColumn = `span ${item.span} / span ${item.span}`;
 
           if (item.type === 'backspace') {
-            btn.className = 'keycap-base keycap-action py-1 sm:py-2 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold';
-            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⌫</span><span class="relative z-10">${item.label}</span>`;
+            btn.className = 'keycap-base keycap-action py-2 flex items-center justify-center gap-1 text-sm font-bold';
+            btn.innerHTML = `<span class="relative z-10 text-base">⌫</span><span class="relative z-10">${item.label}</span>`;
             btn.onclick = () => handleKeypadBackspace();
           } else if (item.type === 'enter') {
-            btn.className = `keycap-base keycap-enter ${enterReady ? 'keycap-enter-ready' : ''} py-1.5 sm:py-2.5 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold`;
-            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⏎</span><span class="relative z-10">${item.label}</span>`;
+            btn.className = `keycap-base keycap-enter ${enterReady ? 'keycap-enter-ready' : ''} py-2.5 flex items-center justify-center gap-1 text-sm font-bold`;
+            btn.innerHTML = `<span class="relative z-10 text-base">⏎</span><span class="relative z-10">${item.label}</span>`;
             btn.onclick = () => handleKeypadEnter(btn);
           } else if (item.type === 'shift') {
-            btn.className = `keycap-base keycap-shift ${shiftOn ? 'keycap-shift-active' : ''} py-1.5 sm:py-2.5 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold`;
-            btn.innerHTML = `<span class="relative z-10 text-sm sm:text-base">⇧</span><span class="relative z-10">${item.label}</span>`;
+            btn.className = `keycap-base keycap-shift ${shiftOn ? 'keycap-shift-active' : ''} py-2.5 flex items-center justify-center gap-1 text-sm font-bold`;
+            btn.innerHTML = `<span class="relative z-10 text-base">⇧</span><span class="relative z-10">${item.label}</span>`;
 
             // 멀티터치 홀드(누른 채로 입력) 및 원터치 토글 모두 지원
             btn.addEventListener('pointerdown', (e) => {
@@ -3204,7 +3210,7 @@ self.addEventListener('fetch', (event) => {
           } else {
             const displayKey = shiftOn && SHIFT_KEY_MAP[item.key] ? SHIFT_KEY_MAP[item.key] : item.key;
             const isConsonant = KEYPAD_CONSONANTS.includes(displayKey);
-            btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-1.5 sm:py-2.5 flex items-center justify-center font-bold`;
+            btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-2.5 flex items-center justify-center font-bold`;
             btn.innerHTML = `<span class="relative z-10">${displayKey}</span>`;
             btn.addEventListener('pointerdown', (e) => {
               e.preventDefault();
@@ -3512,8 +3518,8 @@ self.addEventListener('fetch', (event) => {
         const isCorrectPicked = state.same.completed && choiceChar === item.answer;
 
         btn.className = isCorrectPicked
-          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-sky-500 text-white border-2 border-sky-600 py-2 sm:py-3 flex items-center justify-center'
-          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-sky-50 text-sky-900 border-2 border-sky-300 py-2 sm:py-3 flex items-center justify-center';
+          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-sky-500 text-white border-2 border-sky-600 py-3 flex items-center justify-center'
+          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-sky-50 text-sky-900 border-2 border-sky-300 py-3 flex items-center justify-center';
         btn.textContent = choiceChar;
         btn.onclick = () => handleSameChoiceClick(choiceChar, btn);
         gridEl.appendChild(btn);
@@ -3632,8 +3638,8 @@ self.addEventListener('fetch', (event) => {
         const isCorrectPicked = state.samehard.completed && choiceChar === state.samehard.answer;
 
         btn.className = isCorrectPicked
-          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-indigo-500 text-white border-2 border-indigo-600 py-2 sm:py-3 flex items-center justify-center'
-          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-indigo-50 text-indigo-900 border-2 border-indigo-300 py-2 sm:py-3 flex items-center justify-center';
+          ? 'kid-btn pill-shadow ganada-btn rounded-2xl bg-indigo-500 text-white border-2 border-indigo-600 py-3 flex items-center justify-center'
+          : 'kid-btn pill-shadow ganada-btn rounded-2xl bg-white hover:bg-indigo-50 text-indigo-900 border-2 border-indigo-300 py-3 flex items-center justify-center';
         btn.textContent = choiceChar;
         btn.onclick = () => handleSameHardChoiceClick(choiceChar, btn);
         gridEl.appendChild(btn);
@@ -3781,21 +3787,21 @@ self.addEventListener('fetch', (event) => {
         card.dataset.id = item.id;
         card.dataset.side = 'left';
         const heightClass = modeKey === 'sentencematch' ? 'h-[24%] min-h-[3.2rem] my-auto' : 'flex-1 min-h-0';
-        card.className = `kid-btn ${heightClass} rounded-2xl border-2 px-2.5 sm:px-4 flex items-center justify-between relative cursor-pointer transition-all ${
+        card.className = `kid-btn ${heightClass} rounded-2xl border-2 px-4 flex items-center justify-between relative cursor-pointer transition-all ${
           isMatched ? matchedStyle : isSelected ? activeRing : `bg-white ${themeBorder}`
         }`;
 
         if (isWordMode) {
           card.innerHTML = `
-            <span class="${isBasicWord ? 'text-2xl sm:text-4xl font-bold' : 'text-lg sm:text-3xl'} text-gray-800 mx-auto truncate">${item.leftLabel}</span>
-            <span data-dot="left-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+            <span class="${isBasicWord ? 'text-4xl font-bold' : 'text-3xl'} text-gray-800 mx-auto truncate">${item.leftLabel}</span>
+            <span data-dot="left-${item.id}" class="w-5 h-5 rounded-full ${
               isMatched ? 'bg-emerald-500' : dotColor
             } border-2 border-white shadow shrink-0 -mr-1"></span>
           `;
         } else {
           card.innerHTML = `
-            <span class="text-sm sm:text-xl text-gray-800 truncate pr-2">${item.leftLabel}</span>
-            <span data-dot="left-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+            <span class="text-xl text-gray-800 truncate pr-2">${item.leftLabel}</span>
+            <span data-dot="left-${item.id}" class="w-5 h-5 rounded-full ${
               isMatched ? 'bg-emerald-500' : dotColor
             } border-2 border-white shadow shrink-0 -mr-1"></span>
           `;
@@ -3813,23 +3819,23 @@ self.addEventListener('fetch', (event) => {
         const card = document.createElement('div');
         card.dataset.id = item.id;
         card.dataset.side = 'right';
-        card.className = `kid-btn flex-1 min-h-0 rounded-2xl border-2 px-2.5 sm:px-4 flex items-center justify-between relative cursor-pointer transition-all ${
+        card.className = `kid-btn flex-1 min-h-0 rounded-2xl border-2 px-4 flex items-center justify-between relative cursor-pointer transition-all ${
           isMatched ? matchedStyle : isSelected ? activeRing : `bg-white ${themeBorder}`
         }`;
 
         if (isWordMode) {
           card.innerHTML = `
-            <span data-dot="right-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+            <span data-dot="right-${item.id}" class="w-5 h-5 rounded-full ${
               isMatched ? 'bg-emerald-500' : dotColor
             } border-2 border-white shadow shrink-0 -ml-1"></span>
-            <span class="text-3xl sm:text-5xl mx-auto select-none">${item.rightLabel}</span>
+            <span class="text-5xl mx-auto select-none">${item.rightLabel}</span>
           `;
         } else {
           card.innerHTML = `
-            <span data-dot="right-${item.id}" class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${
+            <span data-dot="right-${item.id}" class="w-5 h-5 rounded-full ${
               isMatched ? 'bg-emerald-500' : dotColor
             } border-2 border-white shadow shrink-0 -ml-1"></span>
-            <span class="text-sm sm:text-xl text-gray-800 truncate pl-2 text-right flex-1">${item.rightLabel}</span>
+            <span class="text-xl text-gray-800 truncate pl-2 text-right flex-1">${item.rightLabel}</span>
           `;
         }
 
@@ -3842,13 +3848,16 @@ self.addEventListener('fetch', (event) => {
 
     function getDotCenter(modeKey, side, id) {
       const board = document.getElementById(`board-${modeKey}`);
-      const dot = board.querySelector(`[data-dot="${side}-${id}"]`);
+      const dot = board ? board.querySelector(`[data-dot="${side}-${id}"]`) : null;
       if (!board || !dot) return { x: 0, y: 0 };
       const bRect = board.getBoundingClientRect();
       const dRect = dot.getBoundingClientRect();
+      // 화면 축소/확대(transform: scale) 시에도 SVG 내부 좌표계와 정확히 일치하도록 스케일 보정
+      const scaleX = bRect.width / (board.clientWidth || bRect.width || 1);
+      const scaleY = bRect.height / (board.clientHeight || bRect.height || 1);
       return {
-        x: dRect.left - bRect.left + dRect.width / 2,
-        y: dRect.top - bRect.top + dRect.height / 2
+        x: (dRect.left - bRect.left + dRect.width / 2) / scaleX,
+        y: (dRect.top - bRect.top + dRect.height / 2) / scaleY
       };
     }
 
@@ -3901,8 +3910,10 @@ self.addEventListener('fetch', (event) => {
       const board = document.getElementById(`board-${activeDrag.modeKey}`);
       if (!board) return;
       const bRect = board.getBoundingClientRect();
-      activeDrag.currX = e.clientX - bRect.left;
-      activeDrag.currY = e.clientY - bRect.top;
+      const scaleX = bRect.width / (board.clientWidth || bRect.width || 1);
+      const scaleY = bRect.height / (board.clientHeight || bRect.height || 1);
+      activeDrag.currX = (e.clientX - bRect.left) / scaleX;
+      activeDrag.currY = (e.clientY - bRect.top) / scaleY;
       redrawMatchingLines(activeDrag.modeKey);
     });
 
@@ -4080,9 +4091,9 @@ self.addEventListener('fetch', (event) => {
       options.forEach((item, idx) => {
         const card = document.createElement('button');
         card.type = 'button';
-        card.className = `kid-btn card-shadow rounded-3xl border-4 ${cardColors[idx % cardColors.length]} p-2 sm:p-4 flex flex-col items-center justify-center transition-all overflow-hidden`;
+        card.className = `kid-btn card-shadow rounded-3xl border-4 ${cardColors[idx % cardColors.length]} p-4 flex flex-col items-center justify-center transition-all overflow-hidden`;
         card.innerHTML = `
-          <div class="text-2xl sm:text-5xl font-bold text-gray-800 tracking-wide">${item.word}</div>
+          <div class="text-5xl font-bold text-gray-800 tracking-wide">${item.word}</div>
         `;
         card.onclick = () => handleListenCardClick(item, card);
         grid.appendChild(card);
@@ -4111,7 +4122,7 @@ self.addEventListener('fetch', (event) => {
         playSoundEffect('success');
         launchConfetti();
 
-        cardElement.className = 'kid-btn card-shadow rounded-3xl border-4 border-emerald-500 bg-emerald-50 p-2 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 animate-pop';
+        cardElement.className = 'kid-btn card-shadow rounded-3xl border-4 border-emerald-500 bg-emerald-50 p-4 flex flex-col items-center justify-center gap-2 animate-pop';
         showPraiseBanner(`"${target.word}" 정답이에요! 참 잘했어요!`);
         speakText(`${target.word}!`, false);
 
@@ -4132,8 +4143,55 @@ self.addEventListener('fetch', (event) => {
     }
 
     /* ==========================================================================
-       11. 유틸리티 & PWA 설치 / 서비스 워커 등록 (updateViaCache: 'none')
+       11. 유틸리티 & 뷰포트 자동 비율 축소(PC 레이아웃 고정 스케일러) & PWA 설치
        ========================================================================== */
+    function updateViewportScale() {
+      const stage = document.getElementById('viewport-stage');
+      const shell = document.getElementById('app-shell');
+      if (!stage || !shell) return;
+
+      // PC 기준 최소/최대 해상도 범위 정의 (이 범위 안에서 PC와 100% 동일한 구성 유지)
+      const MIN_PC_WIDTH = 1080;
+      const MAX_PC_WIDTH = 1152;
+      const MIN_PC_HEIGHT = 700;
+      const MAX_PC_HEIGHT = 860;
+
+      const vv = window.visualViewport;
+      const rawW = vv ? vv.width : window.innerWidth;
+      const rawH = vv ? vv.height : window.innerHeight;
+
+      const stageStyle = window.getComputedStyle(stage);
+      const padX = (parseFloat(stageStyle.paddingLeft) || 0) + (parseFloat(stageStyle.paddingRight) || 0);
+      const padY = (parseFloat(stageStyle.paddingTop) || 0) + (parseFloat(stageStyle.paddingBottom) || 0);
+
+      const availW = Math.max(200, rawW - padX);
+      const availH = Math.max(200, rawH - padY);
+
+      // 화면이 PC 기준보다 작으면 비율에 맞춰 축소하고, 충분히 크면 1배율 유지
+      const scale = Math.min(1, availW / MIN_PC_WIDTH, availH / MIN_PC_HEIGHT);
+
+      // 스케일 역산 후 PC 레이아웃의 여유 폭/높이 범위로 맞춤 설정
+      const unscaledW = Math.min(MAX_PC_WIDTH, Math.max(MIN_PC_WIDTH, availW / scale));
+      const unscaledH = Math.min(MAX_PC_HEIGHT, Math.max(MIN_PC_HEIGHT, availH / scale));
+
+      shell.style.width = `${Math.round(unscaledW)}px`;
+      shell.style.height = `${Math.round(unscaledH)}px`;
+      shell.style.transform = `scale(${scale})`;
+
+      if (state.mode === 'wordmatchbasic' || state.mode === 'wordmatch' || state.mode === 'sentencematch') {
+        requestAnimationFrame(() => redrawMatchingLines(state.mode));
+      }
+    }
+
+    window.addEventListener('resize', updateViewportScale);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(updateViewportScale, 60);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportScale);
+      window.visualViewport.addEventListener('scroll', updateViewportScale);
+    }
+
     function shuffleArray(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -4272,6 +4330,9 @@ self.addEventListener('fetch', (event) => {
       shuffleArray(SINGLE_CHAR_WORD_LIST);
       shuffleArray(SAME_WORD_LIST);
       shuffleArray(SAME_HARD_WORD_LIST);
+
+      // 뷰포트 비율 축소 스케일러 최초 실행
+      updateViewportScale();
 
       // 초기 모드 데이터 세팅
       setupTypingBasicQuestion();
