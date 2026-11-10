@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
   <title>한글 쑥쑥 놀이터 - 어린이 한글 놀이</title>
 
   <!-- PWA 및 모바일 웹앱 메타 태그 -->
@@ -2250,14 +2251,15 @@ self.addEventListener('fetch', (event) => {
     let audioCtx = null;
     let cachedKoreanVoices = [];
     let ttsUnlocked = false;
-    let pendingInitialSpeak = false;
     let ttsWatchdogTimer = null;
+    let speechSessionToken = 0; // 이전 음성의 취소/지연 콜백이 중복 실행되는 것을 막는 고유 토큰
+    let nativeTtsConfirmedWorking = false; // 기기 내장 TTS가 정상 작동 확인되면 클라우드 중복 폴백 비활성화
+    let forceCloudTtsFallback = false; // 기기 내장 TTS가 아예 작동하지 않는 기기에서 클라우드 엔진으로 고정
 
     // 모바일 브라우저에서 오디오 재생 차단을 피하기 위해 단일 Audio 객체를 재사용
     const sharedCloudAudio = typeof Audio !== 'undefined' ? new Audio() : null;
     if (sharedCloudAudio) {
       sharedCloudAudio.preload = 'auto';
-      sharedCloudAudio.referrerPolicy = 'no-referrer';
     }
 
     // 모바일 가비지 컬렉션(GC)에 의해 발화 도중 음성이 끊기는 현상 방지용 전역 보관소
@@ -2280,7 +2282,7 @@ self.addEventListener('fetch', (event) => {
       return audioCtx;
     }
 
-    // 모바일/태블릿 첫 터치 시 Web Audio, SpeechSynthesis, HTML5 Audio 잠금 일괄 해제
+    // 모바일/태블릿 첫 사용자 제스처(touchend/pointerup/click) 시 오디오 컨텍스트만 안전하게 잠금 해제
     function unlockMobileTtsAndAudio() {
       if (ttsUnlocked) return;
       ttsUnlocked = true;
@@ -2290,39 +2292,13 @@ self.addEventListener('fetch', (event) => {
       } catch (e) {}
 
       try {
-        if (sharedCloudAudio) {
-          // 무음 WAV 데이터로 HTML5 Audio 채널 잠금 해제
-          sharedCloudAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-          sharedCloudAudio.volume = 0.01;
-          const p = sharedCloudAudio.play();
-          if (p !== undefined) {
-            p.then(() => {
-              sharedCloudAudio.pause();
-              sharedCloudAudio.volume = 1.0;
-            }).catch(() => {
-              sharedCloudAudio.volume = 1.0;
-            });
-          }
-        }
-      } catch (e) {}
-
-      try {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
+        if ('speechSynthesis' in window && window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
         }
       } catch (e) {}
-
-      // 첫 화면 로드시 자동재생 정책 때문에 막혔던 첫 문제 음성이 있으면 즉시 재생
-      if (pendingInitialSpeak && !state.muted) {
-        pendingInitialSpeak = false;
-        setTimeout(() => {
-          replayCurrentVoice();
-        }, 60);
-      }
     }
 
-    ['touchstart', 'touchend', 'pointerup', 'click', 'keydown'].forEach((evtName) => {
+    ['touchend', 'pointerup', 'click', 'keydown'].forEach((evtName) => {
       window.addEventListener(evtName, unlockMobileTtsAndAudio, { passive: true, once: false });
     });
 
@@ -2486,26 +2462,64 @@ self.addEventListener('fetch', (event) => {
       return cleaned;
     }
 
-    // 클라우드 아나운서 음성 재생 (다중 엔드포인트 폴백 및 재사용 Audio 객체로 모바일 차단 방지)
-    function playCloudTtsAudio(text, onEndCallback, fallbackFn) {
+    // 현재 재생 중인 모든 음성(기기 내장 TTS + 클라우드 오디오)을 충돌 없이 즉시 중지
+    function stopAllActiveSpeech() {
+      speechSessionToken += 1;
+      if (ttsWatchdogTimer) {
+        clearTimeout(ttsWatchdogTimer);
+        ttsWatchdogTimer = null;
+      }
+      if (sharedCloudAudio) {
+        try {
+          sharedCloudAudio.onended = null;
+          sharedCloudAudio.onerror = null;
+          sharedCloudAudio.pause();
+        } catch (e) {}
+      }
+      if ('speechSynthesis' in window) {
+        try {
+          if (window._activeUtterance) {
+            window._activeUtterance.onstart = null;
+            window._activeUtterance.onend = null;
+            window._activeUtterance.onerror = null;
+          }
+          if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            window.speechSynthesis.cancel();
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 클라우드 아나운서 음성 재생 (문장·자모·단어 모두 지원 및 토큰 검증으로 이중 재생 원천 차단)
+    function playCloudTtsAudio(text, myToken, onEndCallback, fallbackFn) {
+      if (myToken !== speechSessionToken) return;
       if (!sharedCloudAudio) {
         if (typeof fallbackFn === 'function') fallbackFn();
         else if (typeof onEndCallback === 'function') onEndCallback();
         return;
       }
 
-      const cleanQuery = String(text).replace(/\.$/, '').trim();
+      // 클라우드 TTS가 문장이나 자모+단어 조합에서도 끊기지 않도록 특수기호 정리
+      const cleanQuery = String(text)
+        .replace(/[!?.]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const dictQuery = cleanQuery.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
       const encoded = encodeURIComponent(cleanQuery);
+      const encodedDict = encodeURIComponent(dictQuery);
+
       const urls = [
         `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`,
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=dict-chrome-ex`,
         `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=gtx`,
-        `https://dict.youdao.com/dictvoice?audio=${encoded}&le=ko`
+        `https://dict.youdao.com/dictvoice?audio=${encodedDict}&le=ko`
       ];
 
       let urlIdx = 0;
       let finished = false;
 
       const finishOnce = () => {
+        if (myToken !== speechSessionToken) return;
         if (!finished) {
           finished = true;
           if (typeof onEndCallback === 'function') onEndCallback();
@@ -2513,7 +2527,7 @@ self.addEventListener('fetch', (event) => {
       };
 
       const tryNextUrl = () => {
-        if (finished) return;
+        if (finished || myToken !== speechSessionToken) return;
         if (urlIdx >= urls.length) {
           finished = true;
           if (typeof fallbackFn === 'function') fallbackFn();
@@ -2530,24 +2544,24 @@ self.addEventListener('fetch', (event) => {
 
           sharedCloudAudio.onended = finishOnce;
           sharedCloudAudio.onerror = () => {
-            tryNextUrl();
+            if (myToken === speechSessionToken) tryNextUrl();
           };
 
           const playPromise = sharedCloudAudio.play();
           if (playPromise !== undefined) {
             playPromise.catch(() => {
-              tryNextUrl();
+              if (myToken === speechSessionToken) tryNextUrl();
             });
           }
         } catch (err) {
-          tryNextUrl();
+          if (myToken === speechSessionToken) tryNextUrl();
         }
       };
 
       tryNextUrl();
     }
 
-    // 한국어 음성 합성 메인 함수 (모바일 사용자 제스처 유지용 동기 발화 + 안드로이드 호환 + 무음 감지 클라우드 폴백)
+    // 한국어 음성 합성 메인 함수 (단일 엔진 보장 + 취소 시 이중 발화 차단 + 모든 파트 100% 호환)
     function speakText(text, saveAsLast = true, onEndCallback = null) {
       if (saveAsLast && text) {
         state.lastSpokenText = text;
@@ -2559,26 +2573,14 @@ self.addEventListener('fetch', (event) => {
         return;
       }
 
-      // 아직 사용자가 화면을 한 번도 터치하지 않은 초기 로드 상태면 첫 터치 시 자동 재생되도록 예약
-      if (!ttsUnlocked && (IS_ANDROID || IS_IOS)) {
-        pendingInitialSpeak = true;
-      }
-
+      // 새 음성을 시작하기 전에 기존 음성 및 타이머를 완전히 종료하고 새 세션 토큰 발급
+      stopAllActiveSpeech();
+      const myToken = speechSessionToken;
       const formattedText = formatTextForNaturalTTS(text);
-
-      // 기존 진행 중인 음성/타이머 정리
-      if (ttsWatchdogTimer) {
-        clearTimeout(ttsWatchdogTimer);
-        ttsWatchdogTimer = null;
-      }
-      if (sharedCloudAudio) {
-        try {
-          sharedCloudAudio.pause();
-        } catch (e) {}
-      }
 
       let callbackCalled = false;
       const finishHandler = () => {
+        if (myToken !== speechSessionToken) return;
         if (ttsWatchdogTimer) {
           clearTimeout(ttsWatchdogTimer);
           ttsWatchdogTimer = null;
@@ -2590,9 +2592,11 @@ self.addEventListener('fetch', (event) => {
       };
 
       const speakWithWebSpeech = (allowCloudFallback = true) => {
+        if (myToken !== speechSessionToken) return;
         if (!('speechSynthesis' in window)) {
+          forceCloudTtsFallback = true;
           if (allowCloudFallback) {
-            playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+            playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
           } else {
             setTimeout(finishHandler, 300);
           }
@@ -2600,24 +2604,21 @@ self.addEventListener('fetch', (event) => {
         }
 
         try {
-          window.speechSynthesis.cancel();
           if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
 
-          // 앞글자 잘림 방지를 위해 setTimeout 대신 앞에 공백을 추가하고 동기적으로 즉시 speak() 호출
-          const utter = new SpeechSynthesisUtterance(` ${formattedText}`);
+          const utter = new SpeechSynthesisUtterance(formattedText);
           window._activeUtterance = utter;
           utter.lang = 'ko-KR';
 
           const bestVoice = getBestKoreanVoice();
-          // 중요: 안드로이드 브라우저는 utter.voice 객체를 직접 할당하면 무음이 되는 기기가 많으므로,
-          // 안드로이드에서 'AUTO_BEST'일 때는 utter.lang = 'ko-KR'만 지정하여 시스템 기본 한국어 엔진을 사용함
+          // 안드로이드 브라우저는 utter.voice 강제 지정 시 무음이 되는 기기가 있으므로 표준 'ko-KR' 유지
           if (bestVoice) {
             if (!IS_ANDROID || (state.tts.voiceURI !== 'AUTO_BEST' && state.tts.voiceURI !== 'CLOUD_TTS')) {
               utter.voice = bestVoice;
             }
-            utter.lang = bestVoice.lang || 'ko-KR';
+            utter.lang = (bestVoice.lang || 'ko-KR').replace('_', '-');
           }
 
           const isShortChar = String(text).trim().length <= 1;
@@ -2627,17 +2628,30 @@ self.addEventListener('fetch', (event) => {
 
           let hasStarted = false;
           utter.onstart = () => {
+            if (myToken !== speechSessionToken) return;
             hasStarted = true;
+            nativeTtsConfirmedWorking = true;
             if (ttsWatchdogTimer) {
               clearTimeout(ttsWatchdogTimer);
               ttsWatchdogTimer = null;
             }
           };
 
-          utter.onend = finishHandler;
-          utter.onerror = () => {
+          utter.onend = () => {
+            if (myToken !== speechSessionToken) return;
+            finishHandler();
+          };
+
+          utter.onerror = (evt) => {
+            if (myToken !== speechSessionToken) return;
+            const errType = evt && evt.error ? String(evt.error) : '';
+            // cancel() 이나 interrupted 로 인한 정상 취소는 폴백하지 않음 (이중 음성 방지 핵심)
+            if (errType === 'canceled' || errType === 'interrupted') {
+              return;
+            }
             if (!hasStarted && allowCloudFallback) {
-              playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+              forceCloudTtsFallback = true;
+              playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
             } else {
               finishHandler();
             }
@@ -2648,29 +2662,39 @@ self.addEventListener('fetch', (event) => {
             window.speechSynthesis.resume();
           }
 
-          // 워치독(Watchdog): 태블릿에 한국어 음성팩이 없거나 인앱 브라우저라서 500ms 내에 음성이 시작되지 않으면 클라우드 성우로 자동 폴백
-          if (allowCloudFallback) {
+          // 아직 기기 내장 TTS 작동 여부가 확인되지 않은 경우에만 워치독 가동
+          // (speaking 상태이면 내장 음성이 재생 중이므로 절대 클라우드 음성을 중복 실행하지 않음)
+          if (allowCloudFallback && !nativeTtsConfirmedWorking) {
             ttsWatchdogTimer = setTimeout(() => {
-              if (!hasStarted && !state.muted) {
-                try {
-                  window.speechSynthesis.cancel();
-                } catch (e) {}
-                playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+              if (myToken !== speechSessionToken || state.muted) return;
+              if (hasStarted || window.speechSynthesis.speaking) {
+                nativeTtsConfirmedWorking = true;
+                return;
               }
-            }, 500);
+              forceCloudTtsFallback = true;
+              try {
+                if (window._activeUtterance) {
+                  window._activeUtterance.onstart = null;
+                  window._activeUtterance.onend = null;
+                  window._activeUtterance.onerror = null;
+                }
+                window.speechSynthesis.cancel();
+              } catch (e) {}
+              playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
+            }, 650);
           }
         } catch (e) {
-          if (allowCloudFallback) {
-            playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+          if (allowCloudFallback && myToken === speechSessionToken) {
+            playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
           } else {
             setTimeout(finishHandler, 300);
           }
         }
       };
 
-      // 클라우드 아나운서 모드 선택 시 클라우드 스트림 우선 재생 후 실패 시 Web Speech 폴백
-      if (state.tts.voiceURI === 'CLOUD_TTS') {
-        playCloudTtsAudio(formattedText, finishHandler, () => speakWithWebSpeech(false));
+      // 사용자가 클라우드 성우를 선택했거나, 내장 TTS가 미작동으로 판별된 기기는 즉시 클라우드 성우로 단일 재생
+      if (state.tts.voiceURI === 'CLOUD_TTS' || (forceCloudTtsFallback && state.tts.voiceURI === 'AUTO_BEST')) {
+        playCloudTtsAudio(formattedText, myToken, finishHandler, () => speakWithWebSpeech(false));
       } else {
         speakWithWebSpeech(true);
       }
@@ -2794,6 +2818,9 @@ self.addEventListener('fetch', (event) => {
     function handleVoiceSelectChange(val) {
       state.tts.voiceURI = val;
       state.tts.preset = val === 'CLOUD_TTS' ? 'cloud' : 'custom';
+      if (val !== 'CLOUD_TTS') {
+        forceCloudTtsFallback = false;
+      }
       saveTtsSettings();
       updateTtsModalUI();
       testTtsVoiceSample();
@@ -2851,6 +2878,10 @@ self.addEventListener('fetch', (event) => {
         speakSameWord();
       } else if (state.mode === 'samehard') {
         speakSameHardWord();
+      } else if (state.mode === 'sentencematch') {
+        const leftItem = state.matching.sentencematch.leftItems[0];
+        if (leftItem) speakText(leftItem.speakLeft);
+        else speakText(state.lastSpokenText, false);
       } else if (state.mode === 'listen') {
         speakListenPrompt();
       } else {
@@ -2864,12 +2895,12 @@ self.addEventListener('fetch', (event) => {
       const btnEl = document.getElementById('btn-mute-toggle');
       if (state.muted) {
         stopListenAutoRepeat();
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        stopAllActiveSpeech();
         iconEl.textContent = '🔇';
-        btnEl.className = 'kid-btn flex items-center justify-center bg-gray-200 border-2 border-gray-300 text-gray-600 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm';
+        btnEl.className = 'kid-btn flex items-center justify-center bg-gray-200 border-2 border-gray-300 text-gray-600 w-8 h-8 rounded-xl text-sm';
       } else {
         iconEl.textContent = '🔔';
-        btnEl.className = 'kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs sm:text-sm';
+        btnEl.className = 'kid-btn flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-300 text-emerald-800 w-8 h-8 rounded-xl text-sm';
         playSoundEffect('tap');
         if (state.mode === 'listen' && !state.listen.answered && state.listen.target) {
           startListenAutoRepeat();
@@ -3155,7 +3186,7 @@ self.addEventListener('fetch', (event) => {
       const item = BASIC_TYPING_LIST[state.typingbasic.index];
       if (!item) return;
       const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
-      speakText(`${cleanName}, ${item.word}`);
+      speakText(`${cleanName}. ${item.word}`);
     }
 
     function nextTypingBasicQuestion() {
@@ -3334,10 +3365,8 @@ self.addEventListener('fetch', (event) => {
             const isConsonant = KEYPAD_CONSONANTS.includes(displayKey);
             btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-2.5 flex items-center justify-center font-bold`;
             btn.innerHTML = `<span class="relative z-10">${displayKey}</span>`;
-            btn.addEventListener('pointerdown', (e) => {
-              e.preventDefault();
-              handleKeypadInput(displayKey, btn);
-            });
+            // 모바일·태블릿 브라우저가 사용자 클릭 제스처로 명확히 인식하여 TTS를 즉시 허용하도록 onclick 사용
+            btn.onclick = () => handleKeypadInput(displayKey, btn);
           }
 
           rowEl.appendChild(btn);
@@ -3468,7 +3497,7 @@ self.addEventListener('fetch', (event) => {
         launchConfetti();
         const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
         showPraiseBanner(`[${item.target}] ${item.word} 완성! 참 잘했어요!`);
-        speakText(`${cleanName}! ${item.word}!`, false);
+        speakText(`${cleanName}. ${item.word}`, false);
 
         setTimeout(() => {
           if (state.mode === 'typingbasic' && state.typingbasic.completed) {
@@ -3880,6 +3909,11 @@ self.addEventListener('fetch', (event) => {
       }
 
       renderMatchingBoard(modeKey);
+
+      // 문장 연결하기는 문제가 시작될 때 왼쪽 앞 문장을 자동으로 읽어 줌
+      if (modeKey === 'sentencematch' && mState.leftItems[0]) {
+        speakText(mState.leftItems[0].speakLeft, true);
+      }
     }
 
     function renderMatchingBoard(modeKey) {
@@ -3992,17 +4026,18 @@ self.addEventListener('fetch', (event) => {
       }
 
       playSoundEffect('tap');
-      speakText(side === 'left' ? item.speakLeft : item.speakRight, false);
 
-      // 탭 연결 처리: 반대편 카드가 이미 선택되어 있으면 즉시 매칭 판정
+      // 탭 연결 처리: 반대편 카드가 이미 선택되어 있으면 중복 발화를 피하고 즉시 매칭 판정에서 발화 처리
       if (side === 'left' && mState.selectedRightId) {
-        verifyMatchingAttempt(modeKey, item.id, mState.selectedRightId);
+        verifyMatchingAttempt(modeKey, item.id, mState.selectedRightId, item.speakLeft);
         return;
       }
       if (side === 'right' && mState.selectedLeftId) {
-        verifyMatchingAttempt(modeKey, mState.selectedLeftId, item.id);
+        verifyMatchingAttempt(modeKey, mState.selectedLeftId, item.id, item.speakRight);
         return;
       }
+
+      speakText(side === 'left' ? item.speakLeft : item.speakRight, false);
 
       // 같은 편 카드 선택 토글
       if (side === 'left') {
@@ -4052,13 +4087,18 @@ self.addEventListener('fetch', (event) => {
         const otherId = cardEl.dataset.id;
         const leftId = side === 'left' ? id : otherId;
         const rightId = side === 'right' ? id : otherId;
-        verifyMatchingAttempt(modeKey, leftId, rightId);
+        const mState = state.matching[modeKey];
+        const targetItem = side === 'left'
+          ? mState.rightItems.find((r) => r.id === rightId)
+          : mState.leftItems.find((l) => l.id === leftId);
+        const fallbackSpeak = targetItem ? (side === 'left' ? targetItem.speakRight : targetItem.speakLeft) : '';
+        verifyMatchingAttempt(modeKey, leftId, rightId, fallbackSpeak);
       } else {
         redrawMatchingLines(modeKey);
       }
     });
 
-    function verifyMatchingAttempt(modeKey, leftId, rightId) {
+    function verifyMatchingAttempt(modeKey, leftId, rightId, wrongAttemptSpeakText = '') {
       const mState = state.matching[modeKey];
       mState.selectedLeftId = null;
       mState.selectedRightId = null;
@@ -4094,6 +4134,9 @@ self.addEventListener('fetch', (event) => {
           mState.selectedLeftId = mState.leftItems[0].id;
         }
         playSoundEffect('wrong');
+        if (wrongAttemptSpeakText) {
+          speakText(wrongAttemptSpeakText, false);
+        }
         const p1 = getDotCenter(modeKey, 'left', leftId);
         const p2 = getDotCenter(modeKey, 'right', rightId);
         mState.tempLine = { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, wrong: true };
