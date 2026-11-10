@@ -2248,9 +2248,24 @@ self.addEventListener('fetch', (event) => {
        4. 사운드 엔진 (고품질 신경망 TTS 자동 탐색 + 한국어 발음·억양 보정 + 클라우드 성우 + 효과음)
        ========================================================================== */
     let audioCtx = null;
-    let ttsDebounceTimer = null;
-    let activeCloudAudio = null;
     let cachedKoreanVoices = [];
+    let ttsUnlocked = false;
+    let pendingInitialSpeak = false;
+    let ttsWatchdogTimer = null;
+
+    // 모바일 브라우저에서 오디오 재생 차단을 피하기 위해 단일 Audio 객체를 재사용
+    const sharedCloudAudio = typeof Audio !== 'undefined' ? new Audio() : null;
+    if (sharedCloudAudio) {
+      sharedCloudAudio.preload = 'auto';
+      sharedCloudAudio.referrerPolicy = 'no-referrer';
+    }
+
+    // 모바일 가비지 컬렉션(GC)에 의해 발화 도중 음성이 끊기는 현상 방지용 전역 보관소
+    window._activeUtterance = null;
+
+    const IS_ANDROID = /Android/i.test(navigator.userAgent || '');
+    const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     function getAudioContext() {
       if (!audioCtx) {
@@ -2264,6 +2279,52 @@ self.addEventListener('fetch', (event) => {
       }
       return audioCtx;
     }
+
+    // 모바일/태블릿 첫 터치 시 Web Audio, SpeechSynthesis, HTML5 Audio 잠금 일괄 해제
+    function unlockMobileTtsAndAudio() {
+      if (ttsUnlocked) return;
+      ttsUnlocked = true;
+
+      try {
+        getAudioContext();
+      } catch (e) {}
+
+      try {
+        if (sharedCloudAudio) {
+          // 무음 WAV 데이터로 HTML5 Audio 채널 잠금 해제
+          sharedCloudAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+          sharedCloudAudio.volume = 0.01;
+          const p = sharedCloudAudio.play();
+          if (p !== undefined) {
+            p.then(() => {
+              sharedCloudAudio.pause();
+              sharedCloudAudio.volume = 1.0;
+            }).catch(() => {
+              sharedCloudAudio.volume = 1.0;
+            });
+          }
+        }
+      } catch (e) {}
+
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.resume();
+        }
+      } catch (e) {}
+
+      // 첫 화면 로드시 자동재생 정책 때문에 막혔던 첫 문제 음성이 있으면 즉시 재생
+      if (pendingInitialSpeak && !state.muted) {
+        pendingInitialSpeak = false;
+        setTimeout(() => {
+          replayCurrentVoice();
+        }, 60);
+      }
+    }
+
+    ['touchstart', 'touchend', 'pointerup', 'click', 'keydown'].forEach((evtName) => {
+      window.addEventListener(evtName, unlockMobileTtsAndAudio, { passive: true, once: false });
+    });
 
     function playSoundEffect(type) {
       if (state.muted) return;
@@ -2425,53 +2486,68 @@ self.addEventListener('fetch', (event) => {
       return cleaned;
     }
 
-    // 클라우드 아나운서 음성 재생 (네트워크 차단/오프라인 시 자동으로 신경망 브라우저 음성으로 폴백)
+    // 클라우드 아나운서 음성 재생 (다중 엔드포인트 폴백 및 재사용 Audio 객체로 모바일 차단 방지)
     function playCloudTtsAudio(text, onEndCallback, fallbackFn) {
-      try {
-        if (activeCloudAudio) {
-          activeCloudAudio.pause();
-          activeCloudAudio = null;
-        }
-        const encoded = encodeURIComponent(text.replace(/\.$/, ''));
-        const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`;
-        const audio = new Audio();
-        audio.referrerPolicy = 'no-referrer';
-        audio.src = url;
-        // 클라우드 음성은 기본 속도가 약간 빠르므로 어린이에게 맞게 재생 속도 조정
-        audio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
-        activeCloudAudio = audio;
-
-        let finished = false;
-        const done = () => {
-          if (!finished) {
-            finished = true;
-            if (typeof onEndCallback === 'function') onEndCallback();
-          }
-        };
-
-        audio.onended = done;
-        audio.onerror = () => {
-          if (!finished) {
-            finished = true;
-            fallbackFn();
-          }
-        };
-
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            if (!finished) {
-              finished = true;
-              fallbackFn();
-            }
-          });
-        }
-      } catch (err) {
-        fallbackFn();
+      if (!sharedCloudAudio) {
+        if (typeof fallbackFn === 'function') fallbackFn();
+        else if (typeof onEndCallback === 'function') onEndCallback();
+        return;
       }
+
+      const cleanQuery = String(text).replace(/\.$/, '').trim();
+      const encoded = encodeURIComponent(cleanQuery);
+      const urls = [
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`,
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=gtx`,
+        `https://dict.youdao.com/dictvoice?audio=${encoded}&le=ko`
+      ];
+
+      let urlIdx = 0;
+      let finished = false;
+
+      const finishOnce = () => {
+        if (!finished) {
+          finished = true;
+          if (typeof onEndCallback === 'function') onEndCallback();
+        }
+      };
+
+      const tryNextUrl = () => {
+        if (finished) return;
+        if (urlIdx >= urls.length) {
+          finished = true;
+          if (typeof fallbackFn === 'function') fallbackFn();
+          else if (typeof onEndCallback === 'function') onEndCallback();
+          return;
+        }
+
+        const currentUrl = urls[urlIdx++];
+        try {
+          sharedCloudAudio.pause();
+          sharedCloudAudio.src = currentUrl;
+          sharedCloudAudio.volume = 1.0;
+          sharedCloudAudio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
+
+          sharedCloudAudio.onended = finishOnce;
+          sharedCloudAudio.onerror = () => {
+            tryNextUrl();
+          };
+
+          const playPromise = sharedCloudAudio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(() => {
+              tryNextUrl();
+            });
+          }
+        } catch (err) {
+          tryNextUrl();
+        }
+      };
+
+      tryNextUrl();
     }
 
-    // 한국어 음성 합성 메인 함수 (cancel() 직후 앞글자 잘림 방지 45ms 디바운스 + 고음질 음성 자동 매칭)
+    // 한국어 음성 합성 메인 함수 (모바일 사용자 제스처 유지용 동기 발화 + 안드로이드 호환 + 무음 감지 클라우드 폴백)
     function speakText(text, saveAsLast = true, onEndCallback = null) {
       if (saveAsLast && text) {
         state.lastSpokenText = text;
@@ -2483,74 +2559,120 @@ self.addEventListener('fetch', (event) => {
         return;
       }
 
+      // 아직 사용자가 화면을 한 번도 터치하지 않은 초기 로드 상태면 첫 터치 시 자동 재생되도록 예약
+      if (!ttsUnlocked && (IS_ANDROID || IS_IOS)) {
+        pendingInitialSpeak = true;
+      }
+
       const formattedText = formatTextForNaturalTTS(text);
 
       // 기존 진행 중인 음성/타이머 정리
-      if (ttsDebounceTimer) {
-        clearTimeout(ttsDebounceTimer);
-        ttsDebounceTimer = null;
+      if (ttsWatchdogTimer) {
+        clearTimeout(ttsWatchdogTimer);
+        ttsWatchdogTimer = null;
       }
-      if (activeCloudAudio) {
-        activeCloudAudio.pause();
-        activeCloudAudio = null;
-      }
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      if (sharedCloudAudio) {
+        try {
+          sharedCloudAudio.pause();
+        } catch (e) {}
       }
 
-      const speakWithWebSpeech = () => {
+      let callbackCalled = false;
+      const finishHandler = () => {
+        if (ttsWatchdogTimer) {
+          clearTimeout(ttsWatchdogTimer);
+          ttsWatchdogTimer = null;
+        }
+        if (!callbackCalled && typeof onEndCallback === 'function') {
+          callbackCalled = true;
+          onEndCallback();
+        }
+      };
+
+      const speakWithWebSpeech = (allowCloudFallback = true) => {
         if (!('speechSynthesis' in window)) {
-          if (typeof onEndCallback === 'function') setTimeout(onEndCallback, 300);
+          if (allowCloudFallback) {
+            playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+          } else {
+            setTimeout(finishHandler, 300);
+          }
           return;
         }
 
-        // cancel() 직후 바로 speak() 호출 시 첫 음절이 잘리는 브라우저 버그 방지 (45ms 지연)
-        ttsDebounceTimer = setTimeout(() => {
-          try {
-            if (window.speechSynthesis.paused) {
-              window.speechSynthesis.resume();
-            }
-
-            const utter = new SpeechSynthesisUtterance(formattedText);
-            utter.lang = 'ko-KR';
-
-            const bestVoice = getBestKoreanVoice();
-            if (bestVoice) {
-              utter.voice = bestVoice;
-              utter.lang = bestVoice.lang || 'ko-KR';
-            }
-
-            // 1글자 음절이나 자모는 살짝 더 또렷하고 천천히 발음
-            const isShortChar = String(text).trim().length <= 1;
-            utter.rate = isShortChar ? Math.max(0.75, state.tts.rate - 0.06) : state.tts.rate;
-            utter.pitch = state.tts.pitch;
-            utter.volume = 1.0;
-
-            let callbackCalled = false;
-            const finishHandler = () => {
-              if (!callbackCalled && typeof onEndCallback === 'function') {
-                callbackCalled = true;
-                onEndCallback();
-              }
-            };
-
-            utter.onend = finishHandler;
-            utter.onerror = finishHandler;
-
-            window.speechSynthesis.speak(utter);
-          } catch (e) {
-            if (typeof onEndCallback === 'function') {
-              setTimeout(onEndCallback, 300);
-            }
+        try {
+          window.speechSynthesis.cancel();
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
           }
-        }, 45);
+
+          // 앞글자 잘림 방지를 위해 setTimeout 대신 앞에 공백을 추가하고 동기적으로 즉시 speak() 호출
+          const utter = new SpeechSynthesisUtterance(` ${formattedText}`);
+          window._activeUtterance = utter;
+          utter.lang = 'ko-KR';
+
+          const bestVoice = getBestKoreanVoice();
+          // 중요: 안드로이드 브라우저는 utter.voice 객체를 직접 할당하면 무음이 되는 기기가 많으므로,
+          // 안드로이드에서 'AUTO_BEST'일 때는 utter.lang = 'ko-KR'만 지정하여 시스템 기본 한국어 엔진을 사용함
+          if (bestVoice) {
+            if (!IS_ANDROID || (state.tts.voiceURI !== 'AUTO_BEST' && state.tts.voiceURI !== 'CLOUD_TTS')) {
+              utter.voice = bestVoice;
+            }
+            utter.lang = bestVoice.lang || 'ko-KR';
+          }
+
+          const isShortChar = String(text).trim().length <= 1;
+          utter.rate = isShortChar ? Math.max(0.75, state.tts.rate - 0.06) : state.tts.rate;
+          utter.pitch = state.tts.pitch;
+          utter.volume = 1.0;
+
+          let hasStarted = false;
+          utter.onstart = () => {
+            hasStarted = true;
+            if (ttsWatchdogTimer) {
+              clearTimeout(ttsWatchdogTimer);
+              ttsWatchdogTimer = null;
+            }
+          };
+
+          utter.onend = finishHandler;
+          utter.onerror = () => {
+            if (!hasStarted && allowCloudFallback) {
+              playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+            } else {
+              finishHandler();
+            }
+          };
+
+          window.speechSynthesis.speak(utter);
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+
+          // 워치독(Watchdog): 태블릿에 한국어 음성팩이 없거나 인앱 브라우저라서 500ms 내에 음성이 시작되지 않으면 클라우드 성우로 자동 폴백
+          if (allowCloudFallback) {
+            ttsWatchdogTimer = setTimeout(() => {
+              if (!hasStarted && !state.muted) {
+                try {
+                  window.speechSynthesis.cancel();
+                } catch (e) {}
+                playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+              }
+            }, 500);
+          }
+        } catch (e) {
+          if (allowCloudFallback) {
+            playCloudTtsAudio(formattedText, finishHandler, finishHandler);
+          } else {
+            setTimeout(finishHandler, 300);
+          }
+        }
       };
 
       // 클라우드 아나운서 모드 선택 시 클라우드 스트림 우선 재생 후 실패 시 Web Speech 폴백
       if (state.tts.voiceURI === 'CLOUD_TTS') {
-        playCloudTtsAudio(formattedText, onEndCallback, speakWithWebSpeech);
+        playCloudTtsAudio(formattedText, finishHandler, () => speakWithWebSpeech(false));
       } else {
-        speakWithWebSpeech();
+        speakWithWebSpeech(true);
       }
     }
 
