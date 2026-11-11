@@ -2340,7 +2340,7 @@ self.addEventListener('fetch', (event) => {
       return audioCtx;
     }
 
-    // 모바일/태블릿 첫 사용자 제스처(touchend/pointerup/click) 시 오디오 및 클라우드 Audio 요소 잠금 해제
+    // 모바일/태블릿 첫 사용자 제스처(touchstart/pointerdown 등) 시 캡처 단계에서 오디오 잠금 선제 해제
     function unlockMobileTtsAndAudio() {
       if (!ttsUnlocked) {
         ttsUnlocked = true;
@@ -2354,40 +2354,11 @@ self.addEventListener('fetch', (event) => {
             window.speechSynthesis.resume();
           }
         } catch (e) {}
-
-        // 클라우드 오디오 객체가 현재 재생 중이 아닐 때만 무음 버퍼로 모바일 재생 권한 획득
-        try {
-          const cloudAudio = getSharedCloudAudio();
-          if (cloudAudio && cloudAudio.paused && !cloudAudio.src) {
-            cloudAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-            cloudAudio.volume = 0.01;
-            const p = cloudAudio.play();
-            if (p !== undefined) {
-              p.then(() => {
-                if (cloudAudio.src.startsWith('data:audio/wav')) {
-                  cloudAudio.pause();
-                  cloudAudio.removeAttribute('src');
-                }
-              }).catch(() => {});
-            }
-          }
-        } catch (e) {}
-      }
-
-      // 첫 화면(타이핑 기본) 진입 시 자동재생 정책으로 대기 중이던 첫 문제 음성을 첫 터치 시 재생
-      if (pendingInitialSpeech) {
-        pendingInitialSpeech = false;
-        const tokenAtTouch = speechSessionToken;
-        setTimeout(() => {
-          if (speechSessionToken === tokenAtTouch && state.mode === 'typingbasic') {
-            speakCurrentTypingBasic();
-          }
-        }, 30);
       }
     }
 
-    ['touchend', 'pointerup', 'click', 'keydown'].forEach((evtName) => {
-      window.addEventListener(evtName, unlockMobileTtsAndAudio, { passive: true, once: false });
+    ['touchstart', 'pointerdown', 'touchend', 'click', 'keydown'].forEach((evtName) => {
+      window.addEventListener(evtName, unlockMobileTtsAndAudio, { capture: true, passive: true });
     });
 
     function playSoundEffect(type) {
@@ -2584,7 +2555,7 @@ self.addEventListener('fetch', (event) => {
       return wasSpeakingOrPending;
     }
 
-    // 클라우드 아나운서 음성 재생 (문장·자모·단어 모두 지원 및 성공 서버 우선 호출로 모바일 제스처 만료 방지)
+    // 클라우드 아나운서 음성 재생 (쉼표·띄어쓰기가 포함된 자모/문장도 끊김 없이 재생되도록 순수 한글화 및 1순위 서버 직결)
     function playCloudTtsAudio(text, myToken, onEndCallback, fallbackFn) {
       if (myToken !== speechSessionToken) return;
       const cloudAudio = getSharedCloudAudio();
@@ -2594,25 +2565,26 @@ self.addEventListener('fetch', (event) => {
         return;
       }
 
-      // 클라우드 TTS가 문장이나 자모+단어 조합에서도 끊기지 않도록 특수기호 정리
+      // 클라우드 성우 엔진이 쉼표(,)나 공백(%20) 때문에 거절하지 않도록 순수 한글 문자열과 일반 문자열을 각각 준비
+      const hangulCompact = String(text).replace(/[^가-힣0-9]/g, '').trim();
       const cleanQuery = String(text)
         .replace(/[!?.]/g, ' ')
+        .replace(/,/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
-      const dictQuery = cleanQuery.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
-      const encoded = encodeURIComponent(cleanQuery);
-      const encodedDict = encodeURIComponent(dictQuery);
 
+      const encodedCompact = encodeURIComponent(hangulCompact || cleanQuery);
+      const encodedClean = encodeURIComponent(cleanQuery);
+
+      // 1순위로 모바일·태블릿에서 차단 없이 즉시 재생되는 서버를 호출하여 사용자 터치 제스처 만료 방지
       const baseProviders = [
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`,
-        `https://dict.youdao.com/dictvoice?audio=${encodedDict}&le=ko`,
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=gtx`,
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=dict-chrome-ex`
+        `https://dict.youdao.com/dictvoice?audio=${encodedCompact}&le=ko`,
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedClean}&tl=ko&client=gtx`,
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedClean}&tl=ko&client=tw-ob`
       ];
 
-      // 이전에 성공했던 서버를 맨 앞으로 배치하여 불필요한 실패 재시도 방지
       const orderedProviders = [
-        { idx: preferredCloudProviderIdx, url: baseProviders[preferredCloudProviderIdx] },
+        { idx: preferredCloudProviderIdx, url: baseProviders[preferredCloudProviderIdx] || baseProviders[0] },
         ...baseProviders.map((url, idx) => ({ idx, url })).filter((item) => item.idx !== preferredCloudProviderIdx)
       ];
 
@@ -2669,7 +2641,7 @@ self.addEventListener('fetch', (event) => {
       tryNextUrl();
     }
 
-    // 한국어 음성 합성 메인 함수 (안드로이드 cancel 직후 삼킴 버그 방지 + 모든 파트 100% 호환)
+    // 한국어 음성 합성 메인 함수 (내장 TTS 미작동 기기 자동 감지 + 클라우드 성우 즉시 전환)
     function speakText(text, saveAsLast = true, onEndCallback = null) {
       if (saveAsLast && text) {
         state.lastSpokenText = text;
@@ -2700,6 +2672,11 @@ self.addEventListener('fetch', (event) => {
           onEndCallback();
         }
       };
+
+      const koVoices = refreshKoreanVoices();
+      if (koVoices.length === 0 && state.tts.voiceURI === 'AUTO_BEST') {
+        forceCloudTtsFallback = true;
+      }
 
       const speakWithWebSpeech = (allowCloudFallback = true) => {
         if (myToken !== speechSessionToken) return;
@@ -2756,7 +2733,6 @@ self.addEventListener('fetch', (event) => {
             utter.onerror = (evt) => {
               if (myToken !== speechSessionToken) return;
               const errType = evt && evt.error ? String(evt.error) : '';
-              // cancel() 이나 interrupted 로 인한 정상 취소는 폴백하지 않음 (이중 음성 방지)
               if (errType === 'canceled' || errType === 'interrupted') {
                 return;
               }
@@ -2773,11 +2749,11 @@ self.addEventListener('fetch', (event) => {
               window.speechSynthesis.resume();
             }
 
-            // 사용자 터치 이후에도 내장 TTS가 750ms 내에 시작되지 않으면 클라우드 음성으로 즉시 구제
-            if (allowCloudFallback && ttsUnlocked) {
+            // 내장 TTS의 onstart가 450ms 내에 실제로 발생하지 않으면 내장 TTS 미작동 기기로 판별하고 클라우드 성우로 전환
+            if (allowCloudFallback) {
               ttsWatchdogTimer = setTimeout(() => {
                 if (myToken !== speechSessionToken || state.muted) return;
-                if (hasStarted || window.speechSynthesis.speaking) {
+                if (hasStarted) {
                   return;
                 }
                 forceCloudTtsFallback = true;
@@ -2790,10 +2766,11 @@ self.addEventListener('fetch', (event) => {
                   window.speechSynthesis.cancel();
                 } catch (e) {}
                 playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
-              }, 750);
+              }, 450);
             }
           } catch (e) {
             if (allowCloudFallback && myToken === speechSessionToken) {
+              forceCloudTtsFallback = true;
               playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
             } else {
               setTimeout(finishHandler, 300);
@@ -2801,15 +2778,14 @@ self.addEventListener('fetch', (event) => {
           }
         };
 
-        // 안드로이드에서 이전 음성이 재생 중일 때 cancel()과 동시에 speak()를 호출하면 새 음성이 삼켜지는 OS 버그 방지
         if (IS_ANDROID && wasSpeaking) {
-          setTimeout(executeSpeak, 65);
+          setTimeout(executeSpeak, 50);
         } else {
           executeSpeak();
         }
       };
 
-      // 사용자가 클라우드 성우를 선택했거나, 내장 TTS가 미작동으로 판별된 기기는 즉시 클라우드 성우로 단일 재생
+      // 사용자가 클라우드 성우를 선택했거나, 내장 TTS가 미작동으로 확인된 기기는 즉시 클라우드 성우로 재생
       if (state.tts.voiceURI === 'CLOUD_TTS' || (forceCloudTtsFallback && state.tts.voiceURI === 'AUTO_BEST')) {
         playCloudTtsAudio(formattedText, myToken, finishHandler, () => speakWithWebSpeech(false));
       } else {
@@ -3605,6 +3581,7 @@ self.addEventListener('fetch', (event) => {
           } else {
             const displayKey = shiftOn && SHIFT_KEY_MAP[item.key] ? SHIFT_KEY_MAP[item.key] : item.key;
             const isConsonant = KEYPAD_CONSONANTS.includes(displayKey);
+            btn.dataset.jamo = displayKey;
             btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-2.5 flex items-center justify-center font-bold`;
             btn.innerHTML = `<span class="relative z-10">${displayKey}</span>`;
             // 모바일·태블릿 브라우저가 사용자 클릭 제스처로 명확히 인식하여 TTS를 즉시 허용하도록 onclick 사용
@@ -3828,19 +3805,83 @@ self.addEventListener('fetch', (event) => {
       }
     }
 
-    // 실제 물리 키보드 Shift / Enter / Backspace 연동 지원
+    // PC 물리 키보드 두벌식 자모 매핑 (한/영키 상태와 무관하게 물리 키 위치 및 한글 호환 자모 모두 인식)
+    const PHYSICAL_CODE_TO_JAMO = {
+      KeyQ: 'ㅂ', KeyW: 'ㅈ', KeyE: 'ㄷ', KeyR: 'ㄱ', KeyT: 'ㅅ',
+      KeyY: 'ㅛ', KeyU: 'ㅕ', KeyI: 'ㅑ', KeyO: 'ㅐ', KeyP: 'ㅔ',
+      KeyA: 'ㅁ', KeyS: 'ㄴ', KeyD: 'ㅇ', KeyF: 'ㄹ', KeyG: 'ㅎ',
+      KeyH: 'ㅗ', KeyJ: 'ㅓ', KeyK: 'ㅏ', KeyL: 'ㅣ',
+      KeyZ: 'ㅋ', KeyX: 'ㅌ', KeyC: 'ㅊ', KeyV: 'ㅍ',
+      KeyB: 'ㅠ', KeyN: 'ㅜ', KeyM: 'ㅡ'
+    };
+
+    const ENG_KEY_TO_JAMO = {
+      q: 'ㅂ', Q: 'ㅃ', w: 'ㅈ', W: 'ㅉ', e: 'ㄷ', E: 'ㄸ', r: 'ㄱ', R: 'ㄲ', t: 'ㅅ', T: 'ㅆ',
+      y: 'ㅛ', u: 'ㅕ', i: 'ㅑ', o: 'ㅐ', O: 'ㅒ', p: 'ㅔ', P: 'ㅖ',
+      a: 'ㅁ', s: 'ㄴ', d: 'ㅇ', f: 'ㄹ', g: 'ㅎ', h: 'ㅗ', j: 'ㅓ', k: 'ㅏ', l: 'ㅣ',
+      z: 'ㅋ', x: 'ㅌ', c: 'ㅊ', v: 'ㅍ', b: 'ㅠ', n: 'ㅜ', m: 'ㅡ'
+    };
+
+    // 실제 물리 키보드 자모 입력 + Shift / Enter / Backspace 연동 지원
     window.addEventListener('keydown', (e) => {
       if (state.mode !== 'typingbasic' && state.mode !== 'word') return;
-      if (e.key === 'Shift' && !state.shiftHeld) {
-        state.shiftHeld = true;
-        state.shiftUsedWhileHeld = false;
-        renderHangulKeypad();
-      } else if (e.key === 'Enter') {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      // 모달 창이 열려 있을 때는 키보드 게임 입력 무시
+      const ttsModal = document.getElementById('tts-settings-modal');
+      const pwaModal = document.getElementById('pwa-files-modal');
+      const installModal = document.getElementById('install-guide-modal');
+      if (
+        (ttsModal && !ttsModal.classList.contains('hidden')) ||
+        (pwaModal && !pwaModal.classList.contains('hidden')) ||
+        (installModal && !installModal.classList.contains('hidden'))
+      ) {
+        return;
+      }
+
+      if (e.key === 'Shift') {
+        if (!state.shiftHeld) {
+          state.shiftHeld = true;
+          state.shiftUsedWhileHeld = false;
+          renderHangulKeypad();
+        }
+        return;
+      }
+
+      if (e.key === 'Enter') {
         e.preventDefault();
         handleKeypadEnter(null);
-      } else if (e.key === 'Backspace') {
+        return;
+      }
+
+      if (e.key === 'Backspace') {
         e.preventDefault();
         handleKeypadBackspace();
+        return;
+      }
+
+      if (e.repeat) return;
+
+      // 1순위: 물리 키 코드(KeyQ ~ KeyM) 기준 두벌식 매핑 (PC가 영문 모드이든 한글 모드이든 동일하게 작동)
+      let mappedJamo = null;
+      const shiftActive = e.shiftKey || isShiftActive();
+
+      if (e.code && PHYSICAL_CODE_TO_JAMO[e.code]) {
+        const baseJamo = PHYSICAL_CODE_TO_JAMO[e.code];
+        mappedJamo = shiftActive && SHIFT_KEY_MAP[baseJamo] ? SHIFT_KEY_MAP[baseJamo] : baseJamo;
+      } else if (e.key && (KEYPAD_CONSONANTS.includes(e.key) || KEYPAD_VOWELS.includes(e.key))) {
+        mappedJamo = shiftActive && SHIFT_KEY_MAP[e.key] ? SHIFT_KEY_MAP[e.key] : e.key;
+      } else if (e.key && ENG_KEY_TO_JAMO[e.key]) {
+        const baseJamo = ENG_KEY_TO_JAMO[e.key];
+        mappedJamo = shiftActive && SHIFT_KEY_MAP[baseJamo] ? SHIFT_KEY_MAP[baseJamo] : baseJamo;
+      }
+
+      if (mappedJamo) {
+        e.preventDefault();
+        const containerId = state.mode === 'typingbasic' ? 'keypad-keyboard-basic' : 'keypad-keyboard';
+        const kbContainer = document.getElementById(containerId);
+        const targetBtn = kbContainer ? kbContainer.querySelector(`[data-jamo="${mappedJamo}"]`) : null;
+        handleKeypadInput(mappedJamo, targetBtn);
       }
     });
 
@@ -4799,11 +4840,7 @@ self.addEventListener('fetch', (event) => {
       setupMatchingGame('wordmatchbasic');
       setupMatchingGame('wordmatch');
       setupMatchingGame('sentencematch');
-      // 모바일 브라우저에서 첫 터치 전 자동발화 호출로 인해 TTS 큐가 잠기는 현상을 막기 위해,
-      // 데스크톱 환경에서만 즉시 발화하고 모바일/태블릿은 첫 터치 시 자동 발화
-      if (!IS_ANDROID && !IS_IOS) {
-        speakCurrentTypingBasic();
-      }
+      speakCurrentTypingBasic();
       registerServiceWorker();
     });
   </script>
