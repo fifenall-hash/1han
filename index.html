@@ -259,6 +259,55 @@
       animation: shakeError 0.38s ease-in-out;
     }
 
+    /* 타이핑(심화) 네모 칸 상단 모아쓰기 음절 가이드 (초성·중성·종성 개별 색상 하이라이트) */
+    .syllable-guide-box {
+      position: relative;
+      width: 2.9rem;
+      height: 2.9rem;
+      border-radius: 0.75rem;
+      background: #FFFDF9;
+      border: 2px solid #FED7AA;
+      box-shadow: 0 2px 0 rgba(251, 146, 60, 0.18);
+      flex-shrink: 0;
+    }
+    .syllable-guide-box.is-active-slot {
+      background: #FFF7ED;
+      border-color: #FB923C;
+      box-shadow: 0 3px 0 rgba(249, 115, 22, 0.28);
+    }
+    .syllable-guide-box.is-done-slot {
+      background: #ECFDF5;
+      border-color: #6EE7B7;
+    }
+    .syllable-guide-part {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.15rem;
+      line-height: 1;
+      font-weight: 700;
+      pointer-events: none;
+      transition: color 0.15s ease, filter 0.15s ease;
+    }
+    .jamo-part-current {
+      color: #E11D48;
+      filter: drop-shadow(0 0 5px rgba(225, 29, 72, 0.38));
+      z-index: 3;
+    }
+    .jamo-part-typed {
+      color: #0284C7;
+      z-index: 2;
+    }
+    .jamo-part-waiting {
+      color: #94A3B8;
+      z-index: 1;
+    }
+    .jamo-part-completed {
+      color: #10B981;
+    }
+
     /* ==========================================================================
        3. PC 기준 고정 타이포그래피 & 카드 크기 (뷰포트 스케일러가 비율 축소 담당)
        ========================================================================== */
@@ -295,6 +344,9 @@
 <body>
   <!-- 꽃가루 축하 이펙트 캔버스 -->
   <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+  <!-- 모바일·태블릿 브라우저 referrer 차단 방지용 클라우드 TTS 전용 오디오 요소 -->
+  <audio id="cloud-tts-audio" referrerpolicy="no-referrer" preload="auto" class="hidden"></audio>
 
   <!-- 뷰포트 자동 배율 스테이지 (PC 화면 구성을 모든 기기에서 비율 유지하며 표시) -->
   <div id="viewport-stage">
@@ -2251,15 +2303,21 @@ self.addEventListener('fetch', (event) => {
     let audioCtx = null;
     let cachedKoreanVoices = [];
     let ttsUnlocked = false;
+    let pendingInitialSpeech = true;
     let ttsWatchdogTimer = null;
     let speechSessionToken = 0; // 이전 음성의 취소/지연 콜백이 중복 실행되는 것을 막는 고유 토큰
-    let nativeTtsConfirmedWorking = false; // 기기 내장 TTS가 정상 작동 확인되면 클라우드 중복 폴백 비활성화
     let forceCloudTtsFallback = false; // 기기 내장 TTS가 아예 작동하지 않는 기기에서 클라우드 엔진으로 고정
+    let preferredCloudProviderIdx = 0; // 한 번 성공한 클라우드 TTS 서버를 최우선 호출하여 지연 제거
 
-    // 모바일 브라우저에서 오디오 재생 차단을 피하기 위해 단일 Audio 객체를 재사용
-    const sharedCloudAudio = typeof Audio !== 'undefined' ? new Audio() : null;
-    if (sharedCloudAudio) {
-      sharedCloudAudio.preload = 'auto';
+    // DOM에 선언된 referrerpolicy="no-referrer" 오디오 요소를 우선 사용하여 모바일 차단 방지
+    function getSharedCloudAudio() {
+      const domAudio = document.getElementById('cloud-tts-audio');
+      if (domAudio) return domAudio;
+      if (!window._fallbackCloudAudio && typeof Audio !== 'undefined') {
+        window._fallbackCloudAudio = new Audio();
+        window._fallbackCloudAudio.preload = 'auto';
+      }
+      return window._fallbackCloudAudio || null;
     }
 
     // 모바일 가비지 컬렉션(GC)에 의해 발화 도중 음성이 끊기는 현상 방지용 전역 보관소
@@ -2282,20 +2340,50 @@ self.addEventListener('fetch', (event) => {
       return audioCtx;
     }
 
-    // 모바일/태블릿 첫 사용자 제스처(touchend/pointerup/click) 시 오디오 컨텍스트만 안전하게 잠금 해제
+    // 모바일/태블릿 첫 사용자 제스처(touchend/pointerup/click) 시 오디오 및 클라우드 Audio 요소 잠금 해제
     function unlockMobileTtsAndAudio() {
-      if (ttsUnlocked) return;
-      ttsUnlocked = true;
+      if (!ttsUnlocked) {
+        ttsUnlocked = true;
 
-      try {
-        getAudioContext();
-      } catch (e) {}
+        try {
+          getAudioContext();
+        } catch (e) {}
 
-      try {
-        if ('speechSynthesis' in window && window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-      } catch (e) {}
+        try {
+          if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        } catch (e) {}
+
+        // 클라우드 오디오 객체가 현재 재생 중이 아닐 때만 무음 버퍼로 모바일 재생 권한 획득
+        try {
+          const cloudAudio = getSharedCloudAudio();
+          if (cloudAudio && cloudAudio.paused && !cloudAudio.src) {
+            cloudAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+            cloudAudio.volume = 0.01;
+            const p = cloudAudio.play();
+            if (p !== undefined) {
+              p.then(() => {
+                if (cloudAudio.src.startsWith('data:audio/wav')) {
+                  cloudAudio.pause();
+                  cloudAudio.removeAttribute('src');
+                }
+              }).catch(() => {});
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 첫 화면(타이핑 기본) 진입 시 자동재생 정책으로 대기 중이던 첫 문제 음성을 첫 터치 시 재생
+      if (pendingInitialSpeech) {
+        pendingInitialSpeech = false;
+        const tokenAtTouch = speechSessionToken;
+        setTimeout(() => {
+          if (speechSessionToken === tokenAtTouch && state.mode === 'typingbasic') {
+            speakCurrentTypingBasic();
+          }
+        }, 30);
+      }
     }
 
     ['touchend', 'pointerup', 'click', 'keydown'].forEach((evtName) => {
@@ -2462,18 +2550,22 @@ self.addEventListener('fetch', (event) => {
       return cleaned;
     }
 
-    // 현재 재생 중인 모든 음성(기기 내장 TTS + 클라우드 오디오)을 충돌 없이 즉시 중지
+    // 현재 재생 중인 모든 음성(기기 내장 TTS + 클라우드 오디오)을 충돌 없이 즉시 중지하고 이전 발화 중 여부를 반환
     function stopAllActiveSpeech() {
       speechSessionToken += 1;
+      let wasSpeakingOrPending = false;
       if (ttsWatchdogTimer) {
         clearTimeout(ttsWatchdogTimer);
         ttsWatchdogTimer = null;
       }
-      if (sharedCloudAudio) {
+      const cloudAudio = getSharedCloudAudio();
+      if (cloudAudio) {
         try {
-          sharedCloudAudio.onended = null;
-          sharedCloudAudio.onerror = null;
-          sharedCloudAudio.pause();
+          cloudAudio.onended = null;
+          cloudAudio.onerror = null;
+          if (!cloudAudio.paused) {
+            cloudAudio.pause();
+          }
         } catch (e) {}
       }
       if ('speechSynthesis' in window) {
@@ -2484,16 +2576,19 @@ self.addEventListener('fetch', (event) => {
             window._activeUtterance.onerror = null;
           }
           if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            wasSpeakingOrPending = true;
             window.speechSynthesis.cancel();
           }
         } catch (e) {}
       }
+      return wasSpeakingOrPending;
     }
 
-    // 클라우드 아나운서 음성 재생 (문장·자모·단어 모두 지원 및 토큰 검증으로 이중 재생 원천 차단)
+    // 클라우드 아나운서 음성 재생 (문장·자모·단어 모두 지원 및 성공 서버 우선 호출로 모바일 제스처 만료 방지)
     function playCloudTtsAudio(text, myToken, onEndCallback, fallbackFn) {
       if (myToken !== speechSessionToken) return;
-      if (!sharedCloudAudio) {
+      const cloudAudio = getSharedCloudAudio();
+      if (!cloudAudio) {
         if (typeof fallbackFn === 'function') fallbackFn();
         else if (typeof onEndCallback === 'function') onEndCallback();
         return;
@@ -2508,14 +2603,20 @@ self.addEventListener('fetch', (event) => {
       const encoded = encodeURIComponent(cleanQuery);
       const encodedDict = encodeURIComponent(dictQuery);
 
-      const urls = [
+      const baseProviders = [
         `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=tw-ob`,
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=dict-chrome-ex`,
+        `https://dict.youdao.com/dictvoice?audio=${encodedDict}&le=ko`,
         `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=gtx`,
-        `https://dict.youdao.com/dictvoice?audio=${encodedDict}&le=ko`
+        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encoded}&tl=ko&client=dict-chrome-ex`
       ];
 
-      let urlIdx = 0;
+      // 이전에 성공했던 서버를 맨 앞으로 배치하여 불필요한 실패 재시도 방지
+      const orderedProviders = [
+        { idx: preferredCloudProviderIdx, url: baseProviders[preferredCloudProviderIdx] },
+        ...baseProviders.map((url, idx) => ({ idx, url })).filter((item) => item.idx !== preferredCloudProviderIdx)
+      ];
+
+      let stepIdx = 0;
       let finished = false;
 
       const finishOnce = () => {
@@ -2528,30 +2629,37 @@ self.addEventListener('fetch', (event) => {
 
       const tryNextUrl = () => {
         if (finished || myToken !== speechSessionToken) return;
-        if (urlIdx >= urls.length) {
+        if (stepIdx >= orderedProviders.length) {
           finished = true;
           if (typeof fallbackFn === 'function') fallbackFn();
           else if (typeof onEndCallback === 'function') onEndCallback();
           return;
         }
 
-        const currentUrl = urls[urlIdx++];
+        const provider = orderedProviders[stepIdx++];
         try {
-          sharedCloudAudio.pause();
-          sharedCloudAudio.src = currentUrl;
-          sharedCloudAudio.volume = 1.0;
-          sharedCloudAudio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
+          cloudAudio.pause();
+          cloudAudio.src = provider.url;
+          cloudAudio.volume = 1.0;
+          cloudAudio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
 
-          sharedCloudAudio.onended = finishOnce;
-          sharedCloudAudio.onerror = () => {
+          cloudAudio.onended = () => {
+            preferredCloudProviderIdx = provider.idx;
+            finishOnce();
+          };
+          cloudAudio.onerror = () => {
             if (myToken === speechSessionToken) tryNextUrl();
           };
 
-          const playPromise = sharedCloudAudio.play();
+          const playPromise = cloudAudio.play();
           if (playPromise !== undefined) {
-            playPromise.catch(() => {
-              if (myToken === speechSessionToken) tryNextUrl();
-            });
+            playPromise
+              .then(() => {
+                preferredCloudProviderIdx = provider.idx;
+              })
+              .catch(() => {
+                if (myToken === speechSessionToken) tryNextUrl();
+              });
           }
         } catch (err) {
           if (myToken === speechSessionToken) tryNextUrl();
@@ -2561,7 +2669,7 @@ self.addEventListener('fetch', (event) => {
       tryNextUrl();
     }
 
-    // 한국어 음성 합성 메인 함수 (단일 엔진 보장 + 취소 시 이중 발화 차단 + 모든 파트 100% 호환)
+    // 한국어 음성 합성 메인 함수 (안드로이드 cancel 직후 삼킴 버그 방지 + 모든 파트 100% 호환)
     function speakText(text, saveAsLast = true, onEndCallback = null) {
       if (saveAsLast && text) {
         state.lastSpokenText = text;
@@ -2573,8 +2681,10 @@ self.addEventListener('fetch', (event) => {
         return;
       }
 
+      pendingInitialSpeech = false;
+
       // 새 음성을 시작하기 전에 기존 음성 및 타이머를 완전히 종료하고 새 세션 토큰 발급
-      stopAllActiveSpeech();
+      const wasSpeaking = stopAllActiveSpeech();
       const myToken = speechSessionToken;
       const formattedText = formatTextForNaturalTTS(text);
 
@@ -2603,92 +2713,99 @@ self.addEventListener('fetch', (event) => {
           return;
         }
 
-        try {
-          if (window.speechSynthesis.paused) {
-            window.speechSynthesis.resume();
-          }
-
-          const utter = new SpeechSynthesisUtterance(formattedText);
-          window._activeUtterance = utter;
-          utter.lang = 'ko-KR';
-
-          const bestVoice = getBestKoreanVoice();
-          // 안드로이드 브라우저는 utter.voice 강제 지정 시 무음이 되는 기기가 있으므로 표준 'ko-KR' 유지
-          if (bestVoice) {
-            if (!IS_ANDROID || (state.tts.voiceURI !== 'AUTO_BEST' && state.tts.voiceURI !== 'CLOUD_TTS')) {
-              utter.voice = bestVoice;
+        const executeSpeak = () => {
+          if (myToken !== speechSessionToken) return;
+          try {
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
             }
-            utter.lang = (bestVoice.lang || 'ko-KR').replace('_', '-');
-          }
 
-          const isShortChar = String(text).trim().length <= 1;
-          utter.rate = isShortChar ? Math.max(0.75, state.tts.rate - 0.06) : state.tts.rate;
-          utter.pitch = state.tts.pitch;
-          utter.volume = 1.0;
+            const utter = new SpeechSynthesisUtterance(formattedText);
+            window._activeUtterance = utter;
+            utter.lang = 'ko-KR';
 
-          let hasStarted = false;
-          utter.onstart = () => {
-            if (myToken !== speechSessionToken) return;
-            hasStarted = true;
-            nativeTtsConfirmedWorking = true;
-            if (ttsWatchdogTimer) {
-              clearTimeout(ttsWatchdogTimer);
-              ttsWatchdogTimer = null;
+            const bestVoice = getBestKoreanVoice();
+            // 안드로이드 브라우저는 utter.voice 강제 지정 시 무음이 되는 기기가 있으므로 표준 'ko-KR' 유지
+            if (bestVoice) {
+              if (!IS_ANDROID || (state.tts.voiceURI !== 'AUTO_BEST' && state.tts.voiceURI !== 'CLOUD_TTS')) {
+                utter.voice = bestVoice;
+              }
+              utter.lang = (bestVoice.lang || 'ko-KR').replace('_', '-');
             }
-          };
 
-          utter.onend = () => {
-            if (myToken !== speechSessionToken) return;
-            finishHandler();
-          };
+            const isShortChar = String(text).trim().length <= 1;
+            utter.rate = isShortChar ? Math.max(0.75, state.tts.rate - 0.06) : state.tts.rate;
+            utter.pitch = state.tts.pitch;
+            utter.volume = 1.0;
 
-          utter.onerror = (evt) => {
-            if (myToken !== speechSessionToken) return;
-            const errType = evt && evt.error ? String(evt.error) : '';
-            // cancel() 이나 interrupted 로 인한 정상 취소는 폴백하지 않음 (이중 음성 방지 핵심)
-            if (errType === 'canceled' || errType === 'interrupted') {
-              return;
-            }
-            if (!hasStarted && allowCloudFallback) {
-              forceCloudTtsFallback = true;
-              playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
-            } else {
+            let hasStarted = false;
+            utter.onstart = () => {
+              if (myToken !== speechSessionToken) return;
+              hasStarted = true;
+              if (ttsWatchdogTimer) {
+                clearTimeout(ttsWatchdogTimer);
+                ttsWatchdogTimer = null;
+              }
+            };
+
+            utter.onend = () => {
+              if (myToken !== speechSessionToken) return;
               finishHandler();
-            }
-          };
+            };
 
-          window.speechSynthesis.speak(utter);
-          if (window.speechSynthesis.paused) {
-            window.speechSynthesis.resume();
-          }
-
-          // 아직 기기 내장 TTS 작동 여부가 확인되지 않은 경우에만 워치독 가동
-          // (speaking 상태이면 내장 음성이 재생 중이므로 절대 클라우드 음성을 중복 실행하지 않음)
-          if (allowCloudFallback && !nativeTtsConfirmedWorking) {
-            ttsWatchdogTimer = setTimeout(() => {
-              if (myToken !== speechSessionToken || state.muted) return;
-              if (hasStarted || window.speechSynthesis.speaking) {
-                nativeTtsConfirmedWorking = true;
+            utter.onerror = (evt) => {
+              if (myToken !== speechSessionToken) return;
+              const errType = evt && evt.error ? String(evt.error) : '';
+              // cancel() 이나 interrupted 로 인한 정상 취소는 폴백하지 않음 (이중 음성 방지)
+              if (errType === 'canceled' || errType === 'interrupted') {
                 return;
               }
-              forceCloudTtsFallback = true;
-              try {
-                if (window._activeUtterance) {
-                  window._activeUtterance.onstart = null;
-                  window._activeUtterance.onend = null;
-                  window._activeUtterance.onerror = null;
+              if (!hasStarted && allowCloudFallback) {
+                forceCloudTtsFallback = true;
+                playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
+              } else {
+                finishHandler();
+              }
+            };
+
+            window.speechSynthesis.speak(utter);
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+            }
+
+            // 사용자 터치 이후에도 내장 TTS가 750ms 내에 시작되지 않으면 클라우드 음성으로 즉시 구제
+            if (allowCloudFallback && ttsUnlocked) {
+              ttsWatchdogTimer = setTimeout(() => {
+                if (myToken !== speechSessionToken || state.muted) return;
+                if (hasStarted || window.speechSynthesis.speaking) {
+                  return;
                 }
-                window.speechSynthesis.cancel();
-              } catch (e) {}
+                forceCloudTtsFallback = true;
+                try {
+                  if (window._activeUtterance) {
+                    window._activeUtterance.onstart = null;
+                    window._activeUtterance.onend = null;
+                    window._activeUtterance.onerror = null;
+                  }
+                  window.speechSynthesis.cancel();
+                } catch (e) {}
+                playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
+              }, 750);
+            }
+          } catch (e) {
+            if (allowCloudFallback && myToken === speechSessionToken) {
               playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
-            }, 650);
+            } else {
+              setTimeout(finishHandler, 300);
+            }
           }
-        } catch (e) {
-          if (allowCloudFallback && myToken === speechSessionToken) {
-            playCloudTtsAudio(formattedText, myToken, finishHandler, finishHandler);
-          } else {
-            setTimeout(finishHandler, 300);
-          }
+        };
+
+        // 안드로이드에서 이전 음성이 재생 중일 때 cancel()과 동시에 speak()를 호출하면 새 음성이 삼켜지는 OS 버그 방지
+        if (IS_ANDROID && wasSpeaking) {
+          setTimeout(executeSpeak, 65);
+        } else {
+          executeSpeak();
         }
       };
 
@@ -3186,7 +3303,7 @@ self.addEventListener('fetch', (event) => {
       const item = BASIC_TYPING_LIST[state.typingbasic.index];
       if (!item) return;
       const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
-      speakText(`${cleanName}. ${item.word}`);
+      speakText(`${cleanName}, ${item.word}`);
     }
 
     function nextTypingBasicQuestion() {
@@ -3205,6 +3322,109 @@ self.addEventListener('fetch', (event) => {
     }
 
     // ----- 모드 2: 타이핑(심화) (단어 전체 완성 후 엔터 제출) -----
+    // 음절 1글자(예: '자', '전', '거', '과')를 모아쓰기 위치별 자모 배열과 타수 인덱스로 변환하여 상단 가이드 박스 생성
+    function createHangulSyllableGuideEl(syllable, activeStrokeIdx, slotState) {
+      const box = document.createElement('div');
+      box.className = `syllable-guide-box ${
+        slotState === 'active' ? 'is-active-slot' : slotState === 'done' ? 'is-done-slot' : ''
+      }`;
+
+      const code = syllable.charCodeAt(0);
+      if (code < 0xAC00 || code > 0xD7A3) {
+        box.textContent = syllable;
+        return box;
+      }
+
+      const offset = code - 0xAC00;
+      const choIdx = Math.floor(offset / (21 * 28));
+      const jungIdx = Math.floor((offset % (21 * 28)) / 28);
+      const jongIdx = offset % 28;
+
+      const cho = CHOSEONG_TABLE[choIdx];
+      const jung = JUNGSEONG_TABLE[jungIdx];
+      const jong = JONGSEONG_TABLE[jongIdx];
+
+      const jungStrokes = JUNGSEONG_DECOMPOSE[jung] ? [...JUNGSEONG_DECOMPOSE[jung]] : [jung];
+      const jongStrokes = !jong ? [] : JONGSEONG_DECOMPOSE[jong] ? [...JONGSEONG_DECOMPOSE[jong]] : [jong];
+
+      const HORIZONTAL_VOWELS = ['ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ'];
+      const isCompoundVowel = jungStrokes.length === 2;
+      const isHorizontalVowel = !isCompoundVowel && HORIZONTAL_VOWELS.includes(jung);
+      const hasJong = jongStrokes.length > 0;
+
+      // 각 자모 조각의 모아쓰기 위치(transform)와 타수 순서(strokeOrder) 계산
+      const parts = [];
+      let strokeCursor = 0;
+
+      if (!isCompoundVowel && !isHorizontalVowel && !hasJong) {
+        // 1) 세로 모음 + 받침 없음 (예: 자, 거, 나, 비)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(-23%, -1%) scale(0.64, 0.80)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(23%, 0%) scale(0.68, 0.88)' });
+      } else if (!isCompoundVowel && !isHorizontalVowel && hasJong) {
+        // 2) 세로 모음 + 받침 있음 (예: 전, 강, 달, 박)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(-23%, -22%) scale(0.58, 0.54)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(23%, -20%) scale(0.62, 0.58)' });
+        if (jongStrokes.length === 1) {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(2%, 27%) scale(0.72, 0.50)' });
+        } else {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(-19%, 27%) scale(0.52, 0.48)' });
+          parts.push({ char: jongStrokes[1], strokeIdx: strokeCursor++, transform: 'translate(21%, 27%) scale(0.52, 0.48)' });
+        }
+      } else if (isHorizontalVowel && !hasJong) {
+        // 3) 가로 모음 + 받침 없음 (예: 고, 구, 소, 크)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(0%, -23%) scale(0.72, 0.55)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(0%, 24%) scale(0.82, 0.58)' });
+      } else if (isHorizontalVowel && hasJong) {
+        // 4) 가로 모음 + 받침 있음 (예: 공, 손, 물, 눈)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(0%, -32%) scale(0.68, 0.43)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(0%, -1%) scale(0.78, 0.43)' });
+        if (jongStrokes.length === 1) {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(0%, 30%) scale(0.68, 0.43)' });
+        } else {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(-19%, 30%) scale(0.50, 0.42)' });
+          parts.push({ char: jongStrokes[1], strokeIdx: strokeCursor++, transform: 'translate(20%, 30%) scale(0.50, 0.42)' });
+        }
+      } else if (isCompoundVowel && !hasJong) {
+        // 5) 복합 모음 + 받침 없음 (예: 과, 쥐, 돼, 의)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(-23%, -21%) scale(0.54, 0.50)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(-21%, 23%) scale(0.60, 0.50)' });
+        parts.push({ char: jungStrokes[1], strokeIdx: strokeCursor++, transform: 'translate(24%, 0%) scale(0.60, 0.84)' });
+      } else {
+        // 6) 복합 모음 + 받침 있음 (예: 왕, 권)
+        parts.push({ char: cho, strokeIdx: strokeCursor++, transform: 'translate(-23%, -30%) scale(0.50, 0.42)' });
+        parts.push({ char: jungStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(-21%, 1%) scale(0.56, 0.42)' });
+        parts.push({ char: jungStrokes[1], strokeIdx: strokeCursor++, transform: 'translate(24%, -15%) scale(0.56, 0.58)' });
+        if (jongStrokes.length === 1) {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(2%, 30%) scale(0.70, 0.43)' });
+        } else {
+          parts.push({ char: jongStrokes[0], strokeIdx: strokeCursor++, transform: 'translate(-18%, 30%) scale(0.50, 0.42)' });
+          parts.push({ char: jongStrokes[1], strokeIdx: strokeCursor++, transform: 'translate(20%, 30%) scale(0.50, 0.42)' });
+        }
+      }
+
+      parts.forEach((p) => {
+        const span = document.createElement('span');
+        let colorClass = 'jamo-part-waiting';
+        if (slotState === 'done') {
+          colorClass = 'jamo-part-completed';
+        } else if (slotState === 'active') {
+          if (p.strokeIdx === activeStrokeIdx) {
+            colorClass = 'jamo-part-current';
+          } else if (p.strokeIdx < activeStrokeIdx) {
+            colorClass = 'jamo-part-typed';
+          } else {
+            colorClass = 'jamo-part-waiting';
+          }
+        }
+        span.className = `syllable-guide-part ${colorClass}`;
+        span.style.transform = p.transform;
+        span.textContent = p.char;
+        box.appendChild(span);
+      });
+
+      return box;
+    }
+
     function setupWordQuestion() {
       const item = WORD_LIST[state.word.index];
       const syllables = Array.from(item.word);
@@ -3229,17 +3449,23 @@ self.addEventListener('fetch', (event) => {
       document.getElementById('word-progress').textContent = `${state.word.index + 1} / ${WORD_LIST.length}`;
       document.getElementById('word-emoji').textContent = item.emoji;
 
-      // 상단 안내 메시지 (힌트 없이 현재 입력 상태 및 엔터 제출 안내)
+      // 상단 안내 메시지 (현재 쳐야 할 색칠된 자모 안내 및 엔터 제출 안내)
       const guideEl = document.getElementById('word-jamo-guide');
       if (state.word.completed) {
         guideEl.innerHTML = `🎉 우와! <strong>"${item.word}"</strong> 낱말을 완성했어요!`;
       } else if (state.word.readyToSubmit) {
         guideEl.innerHTML = `✨ 글자를 모두 채웠어요! 오른쪽 <strong>[ ⏎ 엔터 ]</strong> 키를 눌러 정답을 제출하세요!`;
       } else {
-        guideEl.innerHTML = `소리를 잘 듣고 키보드로 글자를 만든 뒤, 끝까지 채우면 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
+        const targetSyllable = syllables[state.word.activeSlot];
+        const targetStrokes = targetSyllable ? decomposeSyllableToKeystrokes(targetSyllable) : [];
+        const nextJamo = targetStrokes[state.word.currentStrokes.length] || '';
+        const needShift = Object.values(SHIFT_KEY_MAP).includes(nextJamo);
+        guideEl.innerHTML = nextJamo
+          ? `네모 칸 위 글자에서 <strong class="text-rose-600">[ ${nextJamo} ]</strong>${needShift ? ' (⇧쉬프트)' : ''} 부분을 보고 키보드로 입력해 보세요!`
+          : `소리를 잘 듣고 키보드로 글자를 만든 뒤, 끝까지 채우면 <strong>[ ⏎ 엔터 ]</strong>를 누르세요!`;
       }
 
-      // 음절 슬롯 렌더링 (회색 글자 힌트 없음)
+      // 음절 슬롯 렌더링 (각 네모 칸 위에 목표 글자 표시 + 현재 입력할 자모만 색상 하이라이트)
       const slotsContainer = document.getElementById('word-slots-container');
       slotsContainer.innerHTML = '';
 
@@ -3251,6 +3477,21 @@ self.addEventListener('fetch', (event) => {
           return;
         }
 
+        const colWrap = document.createElement('div');
+        colWrap.className = 'flex flex-col items-center gap-1.5';
+
+        const slotState = state.word.completedSlots[idx]
+          ? 'done'
+          : idx === state.word.activeSlot && !state.word.readyToSubmit
+            ? 'active'
+            : 'waiting';
+        const activeStrokeIdx = idx === state.word.activeSlot ? state.word.currentStrokes.length : -1;
+
+        // 1. 네모 칸 위 음절 가이드 (현재 써야 할 자음/모음 하이라이트)
+        const guideBox = createHangulSyllableGuideEl(char, activeStrokeIdx, slotState);
+        colWrap.appendChild(guideBox);
+
+        // 2. 네모 입력 칸
         const btn = document.createElement('button');
         btn.type = 'button';
 
@@ -3273,7 +3514,8 @@ self.addEventListener('fetch', (event) => {
           btn.onclick = () => speakCurrentWord();
         }
 
-        slotsContainer.appendChild(btn);
+        colWrap.appendChild(btn);
+        slotsContainer.appendChild(colWrap);
       });
 
       renderHangulKeypad();
@@ -3497,13 +3739,19 @@ self.addEventListener('fetch', (event) => {
         launchConfetti();
         const cleanName = JAMO_TTS_NAMES[item.target] || item.name;
         showPraiseBanner(`[${item.target}] ${item.word} 완성! 참 잘했어요!`);
-        speakText(`${cleanName}. ${item.word}`, false);
 
-        setTimeout(() => {
+        let advanced = false;
+        const goNext = () => {
+          if (advanced) return;
+          advanced = true;
           if (state.mode === 'typingbasic' && state.typingbasic.completed) {
             nextTypingBasicQuestion();
           }
-        }, 2000);
+        };
+        speakText(`${cleanName}, ${item.word}`, false, () => {
+          setTimeout(goNext, 700);
+        });
+        setTimeout(goNext, 3800);
         return;
       }
 
@@ -3526,13 +3774,19 @@ self.addEventListener('fetch', (event) => {
         playSoundEffect('success');
         launchConfetti();
         showPraiseBanner(`"${item.word}" 완성! 참 잘했어요!`);
-        speakText(`${item.word}!`, false);
 
-        setTimeout(() => {
+        let advanced = false;
+        const goNext = () => {
+          if (advanced) return;
+          advanced = true;
           if (state.mode === 'word' && state.word.completed) {
             nextWordQuestion();
           }
-        }, 2200);
+        };
+        speakText(`${item.word}!`, false, () => {
+          setTimeout(goNext, 700);
+        });
+        setTimeout(goNext, 3500);
       }
     }
 
@@ -4018,43 +4272,32 @@ self.addEventListener('fetch', (event) => {
     }
 
     function handleMatchPointerDown(e, modeKey, side, item) {
-      e.preventDefault();
       const mState = state.matching[modeKey];
       if (mState.matchedIds.includes(item.id)) {
-        speakText(item.speakFull, false);
+        activeDrag = {
+          modeKey,
+          side,
+          id: item.id,
+          item,
+          alreadyMatched: true,
+          moved: false
+        };
         return;
       }
 
       playSoundEffect('tap');
 
-      // 탭 연결 처리: 반대편 카드가 이미 선택되어 있으면 중복 발화를 피하고 즉시 매칭 판정에서 발화 처리
-      if (side === 'left' && mState.selectedRightId) {
-        verifyMatchingAttempt(modeKey, item.id, mState.selectedRightId, item.speakLeft);
-        return;
-      }
-      if (side === 'right' && mState.selectedLeftId) {
-        verifyMatchingAttempt(modeKey, mState.selectedLeftId, item.id, item.speakRight);
-        return;
-      }
-
-      speakText(side === 'left' ? item.speakLeft : item.speakRight, false);
-
-      // 같은 편 카드 선택 토글
-      if (side === 'left') {
-        mState.selectedLeftId = item.id;
-        mState.selectedRightId = null;
-      } else {
-        mState.selectedRightId = item.id;
-        mState.selectedLeftId = null;
-      }
-      renderMatchingBoard(modeKey);
-
-      // 드래그 시작 설정
+      // 드래그 시작 설정 (음성 발화 및 매칭 판정은 모바일 브라우저가 신뢰하는 pointerup 시점에 수행)
       const startPt = getDotCenter(modeKey, side, item.id);
       activeDrag = {
         modeKey,
         side,
         id: item.id,
+        item,
+        alreadyMatched: false,
+        moved: false,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
         startX: startPt.x,
         startY: startPt.y,
         currX: startPt.x,
@@ -4063,7 +4306,11 @@ self.addEventListener('fetch', (event) => {
     }
 
     window.addEventListener('pointermove', (e) => {
-      if (!activeDrag) return;
+      if (!activeDrag || activeDrag.alreadyMatched) return;
+      const dist = Math.hypot(e.clientX - activeDrag.startClientX, e.clientY - activeDrag.startClientY);
+      if (dist > 8) {
+        activeDrag.moved = true;
+      }
       const board = document.getElementById(`board-${activeDrag.modeKey}`);
       if (!board) return;
       const bRect = board.getBoundingClientRect();
@@ -4076,23 +4323,54 @@ self.addEventListener('fetch', (event) => {
 
     window.addEventListener('pointerup', (e) => {
       if (!activeDrag) return;
-      const { modeKey, side, id } = activeDrag;
+      const dragInfo = activeDrag;
       activeDrag = null;
+
+      const { modeKey, side, id, item, alreadyMatched, moved } = dragInfo;
+      const mState = state.matching[modeKey];
+
+      if (alreadyMatched) {
+        speakText(item.speakFull, false);
+        return;
+      }
 
       // 손을 뗀 위치에 반대편 카드가 있는지 확인
       const targetEl = document.elementFromPoint(e.clientX, e.clientY);
       const cardEl = targetEl ? targetEl.closest('[data-side]') : null;
 
+      // 1) 드래그하여 반대편 카드 위에서 손을 뗀 경우
       if (cardEl && cardEl.dataset.side && cardEl.dataset.side !== side) {
         const otherId = cardEl.dataset.id;
         const leftId = side === 'left' ? id : otherId;
         const rightId = side === 'right' ? id : otherId;
-        const mState = state.matching[modeKey];
         const targetItem = side === 'left'
           ? mState.rightItems.find((r) => r.id === rightId)
           : mState.leftItems.find((l) => l.id === leftId);
         const fallbackSpeak = targetItem ? (side === 'left' ? targetItem.speakRight : targetItem.speakLeft) : '';
         verifyMatchingAttempt(modeKey, leftId, rightId, fallbackSpeak);
+        return;
+      }
+
+      // 2) 드래그하지 않고 카드를 터치(탭)한 경우 (pointerup 시점이므로 모바일 TTS 100% 허용)
+      if (!moved) {
+        if (side === 'left' && mState.selectedRightId) {
+          verifyMatchingAttempt(modeKey, item.id, mState.selectedRightId, item.speakLeft);
+          return;
+        }
+        if (side === 'right' && mState.selectedLeftId) {
+          verifyMatchingAttempt(modeKey, mState.selectedLeftId, item.id, item.speakRight);
+          return;
+        }
+
+        if (side === 'left') {
+          mState.selectedLeftId = item.id;
+          mState.selectedRightId = null;
+        } else {
+          mState.selectedRightId = item.id;
+          mState.selectedLeftId = null;
+        }
+        renderMatchingBoard(modeKey);
+        speakText(side === 'left' ? item.speakLeft : item.speakRight, false);
       } else {
         redrawMatchingLines(modeKey);
       }
@@ -4112,21 +4390,35 @@ self.addEventListener('fetch', (event) => {
         renderMatchingBoard(modeKey);
 
         const pairObj = mState.pairs.find((p) => p.id === leftId);
-        if (pairObj) {
-          speakText(pairObj.speakFull);
-        }
+        const isAllCompleted = mState.matchedIds.length === mState.leftItems.length;
 
-        // 모든 왼쪽 문제 연결 완료 시 축하 및 다음 라운드 (단어·그림은 4개, 문장 연결은 1개)
-        if (mState.matchedIds.length === mState.leftItems.length) {
+        // 모든 왼쪽 문제 연결 완료 시 축하 및 문장 낭독이 완전히 끝난 뒤 다음 문제로 이동
+        if (isAllCompleted) {
           addStarSticker(1);
           playSoundEffect('success');
           launchConfetti();
           showPraiseBanner(modeKey === 'sentencematch' ? '문장을 바르게 완성했어요! 최고예요!' : '모두 바르게 연결했어요! 최고예요!');
-          setTimeout(() => {
+
+          let advanced = false;
+          const goNextRound = () => {
+            if (advanced) return;
+            advanced = true;
             if (state.mode === modeKey) {
               setupMatchingGame(modeKey);
             }
-          }, 2500);
+          };
+
+          if (pairObj) {
+            speakText(pairObj.speakFull, true, () => {
+              setTimeout(goNextRound, 850);
+            });
+            // 음성이 매우 길거나 무음 상태일 때를 대비한 넉넉한 안전 타이머
+            setTimeout(goNextRound, 6000);
+          } else {
+            setTimeout(goNextRound, 2200);
+          }
+        } else if (pairObj) {
+          speakText(pairObj.speakFull);
         }
       } else {
         // 오답 연결 시 빨간 점선 표시 후 흔들림 피드백 (문장 연결하기는 왼쪽 1개 항목 선택 상태 유지)
@@ -4507,7 +4799,11 @@ self.addEventListener('fetch', (event) => {
       setupMatchingGame('wordmatchbasic');
       setupMatchingGame('wordmatch');
       setupMatchingGame('sentencematch');
-      speakCurrentTypingBasic();
+      // 모바일 브라우저에서 첫 터치 전 자동발화 호출로 인해 TTS 큐가 잠기는 현상을 막기 위해,
+      // 데스크톱 환경에서만 즉시 발화하고 모바일/태블릿은 첫 터치 시 자동 발화
+      if (!IS_ANDROID && !IS_IOS) {
+        speakCurrentTypingBasic();
+      }
       registerServiceWorker();
     });
   </script>
