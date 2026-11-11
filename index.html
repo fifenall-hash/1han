@@ -1166,6 +1166,24 @@
             </p>
           </div>
 
+          <!-- 2-2. 기기 내부 TTS 엔진 진단 및 설정 안내 -->
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1.5 text-xs text-amber-900">
+            <div class="flex items-center justify-between">
+              <span class="font-bold">🔍 현재 기기 TTS 상태 진단</span>
+              <button
+                type="button"
+                onclick="retryNativeTtsDetection()"
+                class="kid-btn bg-white border border-amber-300 text-amber-800 px-2 py-0.5 rounded-lg text-[11px] font-bold"
+              >
+                🔄 기기 음성 재감지
+              </button>
+            </div>
+            <p id="tts-diag-status" class="font-bold text-indigo-700">진단 중...</p>
+            <p class="text-[11px] text-amber-800 leading-relaxed">
+              ⚙️ <strong>기기 설정 팁:</strong> 안드로이드/갤럭시 탭은 <strong>[설정 → 일반 → 텍스트 읽어주기(TTS)]</strong>에서 선호 엔진을 <strong>Google 음성 인식 및 합성</strong>으로 바꾸고 <strong>한국어 음성 데이터</strong>를 설치하면 모든 음성이 가장 자연스럽게 나옵니다.
+            </p>
+          </div>
+
           <!-- 3. 말하기 속도 & 목소리 톤 미세 조절 -->
           <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-3">
             <div>
@@ -2555,7 +2573,7 @@ self.addEventListener('fetch', (event) => {
       return wasSpeakingOrPending;
     }
 
-    // 클라우드 아나운서 음성 재생 (쉼표·띄어쓰기가 포함된 자모/문장도 끊김 없이 재생되도록 순수 한글화 및 1순위 서버 직결)
+    // 클라우드 아나운서 음성 재생 (쉼표·공백이 있는 복합 어절/문장은 단일 단어 단위로 분할하여 100% 끊김 없이 연속 재생)
     function playCloudTtsAudio(text, myToken, onEndCallback, fallbackFn) {
       if (myToken !== speechSessionToken) return;
       const cloudAudio = getSharedCloudAudio();
@@ -2565,32 +2583,18 @@ self.addEventListener('fetch', (event) => {
         return;
       }
 
-      // 클라우드 성우 엔진이 쉼표(,)나 공백(%20) 때문에 거절하지 않도록 순수 한글 문자열과 일반 문자열을 각각 준비
-      const hangulCompact = String(text).replace(/[^가-힣0-9]/g, '').trim();
-      const cleanQuery = String(text)
-        .replace(/[!?.]/g, ' ')
-        .replace(/,/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      // '시옷, 사자' 또는 '토끼가 깡충깡충 뛰어요'처럼 여러 어절로 된 텍스트를 개별 단어 배열로 분리
+      const wordChunks = String(text)
+        .split(/[\s,.!?~]+/)
+        .map((chunk) => chunk.replace(/[^가-힣0-9]/g, '').trim())
+        .filter(Boolean);
 
-      const encodedCompact = encodeURIComponent(hangulCompact || cleanQuery);
-      const encodedClean = encodeURIComponent(cleanQuery);
+      if (wordChunks.length === 0) {
+        if (typeof onEndCallback === 'function') onEndCallback();
+        return;
+      }
 
-      // 1순위로 모바일·태블릿에서 차단 없이 즉시 재생되는 서버를 호출하여 사용자 터치 제스처 만료 방지
-      const baseProviders = [
-        `https://dict.youdao.com/dictvoice?audio=${encodedCompact}&le=ko`,
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedClean}&tl=ko&client=gtx`,
-        `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedClean}&tl=ko&client=tw-ob`
-      ];
-
-      const orderedProviders = [
-        { idx: preferredCloudProviderIdx, url: baseProviders[preferredCloudProviderIdx] || baseProviders[0] },
-        ...baseProviders.map((url, idx) => ({ idx, url })).filter((item) => item.idx !== preferredCloudProviderIdx)
-      ];
-
-      let stepIdx = 0;
       let finished = false;
-
       const finishOnce = () => {
         if (myToken !== speechSessionToken) return;
         if (!finished) {
@@ -2599,46 +2603,82 @@ self.addEventListener('fetch', (event) => {
         }
       };
 
-      const tryNextUrl = () => {
+      // 각 어절(단어)을 순서대로 재생하여 사전 서버에서 긴 문장이 거절되는 현상을 근본 차단
+      const playChunkAt = (chunkIdx) => {
         if (finished || myToken !== speechSessionToken) return;
-        if (stepIdx >= orderedProviders.length) {
-          finished = true;
-          if (typeof fallbackFn === 'function') fallbackFn();
-          else if (typeof onEndCallback === 'function') onEndCallback();
+        if (chunkIdx >= wordChunks.length) {
+          finishOnce();
           return;
         }
 
-        const provider = orderedProviders[stepIdx++];
-        try {
-          cloudAudio.pause();
-          cloudAudio.src = provider.url;
-          cloudAudio.volume = 1.0;
-          cloudAudio.playbackRate = Math.max(0.75, Math.min(1.2, state.tts.rate));
+        const word = wordChunks[chunkIdx];
+        const encodedWord = encodeURIComponent(word);
 
-          cloudAudio.onended = () => {
-            preferredCloudProviderIdx = provider.idx;
-            finishOnce();
-          };
-          cloudAudio.onerror = () => {
-            if (myToken === speechSessionToken) tryNextUrl();
-          };
+        const baseProviders = [
+          `https://dict.youdao.com/dictvoice?audio=${encodedWord}&le=ko`,
+          `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedWord}&tl=ko&client=gtx`,
+          `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodedWord}&tl=ko&client=tw-ob`
+        ];
 
-          const playPromise = cloudAudio.play();
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                preferredCloudProviderIdx = provider.idx;
-              })
-              .catch(() => {
-                if (myToken === speechSessionToken) tryNextUrl();
-              });
+        const orderedProviders = [
+          { idx: preferredCloudProviderIdx, url: baseProviders[preferredCloudProviderIdx] || baseProviders[0] },
+          ...baseProviders.map((url, idx) => ({ idx, url })).filter((item) => item.idx !== preferredCloudProviderIdx)
+        ];
+
+        let stepIdx = 0;
+        const tryNextProvider = () => {
+          if (finished || myToken !== speechSessionToken) return;
+          if (stepIdx >= orderedProviders.length) {
+            if (chunkIdx === 0 && typeof fallbackFn === 'function') {
+              finished = true;
+              fallbackFn();
+            } else {
+              playChunkAt(chunkIdx + 1);
+            }
+            return;
           }
-        } catch (err) {
-          if (myToken === speechSessionToken) tryNextUrl();
-        }
+
+          const provider = orderedProviders[stepIdx++];
+          try {
+            cloudAudio.pause();
+            cloudAudio.src = provider.url;
+            cloudAudio.volume = 1.0;
+            cloudAudio.playbackRate = Math.max(0.75, Math.min(1.25, state.tts.rate));
+
+            cloudAudio.onended = () => {
+              if (myToken !== speechSessionToken) return;
+              preferredCloudProviderIdx = provider.idx;
+              // 다음 어절이 있으면 자연스러운 호흡(90ms) 후 이어서 재생
+              if (chunkIdx + 1 < wordChunks.length) {
+                setTimeout(() => playChunkAt(chunkIdx + 1), 90);
+              } else {
+                finishOnce();
+              }
+            };
+
+            cloudAudio.onerror = () => {
+              if (myToken === speechSessionToken) tryNextProvider();
+            };
+
+            const playPromise = cloudAudio.play();
+            if (playPromise !== undefined) {
+              playPromise
+                .then(() => {
+                  preferredCloudProviderIdx = provider.idx;
+                })
+                .catch(() => {
+                  if (myToken === speechSessionToken) tryNextProvider();
+                });
+            }
+          } catch (err) {
+            if (myToken === speechSessionToken) tryNextProvider();
+          }
+        };
+
+        tryNextProvider();
       };
 
-      tryNextUrl();
+      playChunkAt(0);
     }
 
     // 한국어 음성 합성 메인 함수 (내장 TTS 미작동 기기 자동 감지 + 클라우드 성우 즉시 전환)
@@ -2840,11 +2880,37 @@ self.addEventListener('fetch', (event) => {
       if (badgeEl) {
         if (state.tts.voiceURI === 'CLOUD_TTS') {
           badgeEl.textContent = '클라우드 성우';
+        } else if (forceCloudTtsFallback) {
+          badgeEl.textContent = '클라우드 자동 전환됨';
         } else {
           const best = getBestKoreanVoice();
           badgeEl.textContent = best && scoreKoreanVoice(best) >= 60 ? '★ 신경망 고음질' : '기기 내장 음성';
         }
       }
+
+      const diagEl = document.getElementById('tts-diag-status');
+      if (diagEl) {
+        if (koVoices.length === 0) {
+          diagEl.textContent = '⚠️ 기기 내 한국어 TTS 미설치 → 클라우드 보조 성우 작동 중';
+          diagEl.className = 'font-bold text-amber-700';
+        } else if (forceCloudTtsFallback) {
+          diagEl.textContent = `⚠️ 기기 내장 TTS 응답 지연(음성 ${koVoices.length}개) → 클라우드 성우로 자동 전환됨`;
+          diagEl.className = 'font-bold text-amber-700';
+        } else {
+          diagEl.textContent = `✅ 기기 내장 한국어 TTS 정상 작동 중 (감지된 한국어 음성: ${koVoices.length}개)`;
+          diagEl.className = 'font-bold text-emerald-700';
+        }
+      }
+    }
+
+    function retryNativeTtsDetection() {
+      playSoundEffect('tap');
+      forceCloudTtsFallback = false;
+      state.tts.voiceURI = 'AUTO_BEST';
+      saveTtsSettings();
+      refreshKoreanVoices();
+      updateTtsModalUI();
+      speakText('기기 내장 한국어 목소리를 다시 연결했어요!', false);
     }
 
     function updateTtsModalUI() {
