@@ -224,10 +224,10 @@
       z-index: 10;
     }
 
-    /* 59열 정밀 스태거드 키보드 그리드 (모든 자음·모음 키 1개 = 정확히 5칸 고정) */
+    /* 69열 정밀 스태거드 키보드 그리드 (모든 자음·모음 키 1개 = 정확히 5칸 고정, ㅣ~엔터 사이 2키(10칸) 여백) */
     .kb-row-grid {
       display: grid;
-      grid-template-columns: repeat(59, minmax(0, 1fr));
+      grid-template-columns: repeat(69, minmax(0, 1fr));
     }
 
     @keyframes popIn {
@@ -2007,14 +2007,13 @@ self.addEventListener('fetch', (event) => {
       'ㅔ': 'ㅖ'
     };
 
-    // 실제 한글 두벌식 물리 키보드 4줄 배열 (59열 그리드 기준: 모든 자음·모음 키는 정확히 span 5로 100% 동일 크기, 엔터(11칸)보다 살짝 긴 우측 쉬프트(14칸) 및 우측 끝 정렬)
+    // 실제 한글 두벌식 물리 키보드 배열 (69열 그리드 기준: 모든 자음·모음 키는 정확히 span 5로 100% 동일 크기, ㅣ와 엔터 사이 2키(10칸) 여백, 지우기 제거)
     const KEYBOARD_LAYOUT_ROWS = [
-      // 0열 (상단 기능 행: ㅔ 키(47~51열) 오른쪽 위 위치인 49~59열에 지우기 백스페이스 10칸 배치)
+      // 0열 (상단 안내 표시줄)
       [
-        { type: 'status', span: 49 },
-        { type: 'backspace', label: '지우기', span: 10 }
+        { type: 'status', span: 69 }
       ],
-      // 1열 (좌측 1칸 여백 후 ㅂ ㅈ ㄷ ㄱ ㅅ ㅛ ㅕ ㅑ ㅐ ㅔ 10개 키 × 5칸 = 50칸 + 우측 8칸 여백)
+      // 1열 (좌측 1칸 여백 + ㅂ ㅈ ㄷ ㄱ ㅅ ㅛ ㅕ ㅑ ㅐ ㅔ 10개 키 × 5칸 = 50칸 + 우측 18칸 여백 = 총 69칸)
       [
         { type: 'spacer', span: 1 },
         { type: 'jamo', key: 'ㅂ', span: 5 },
@@ -2027,9 +2026,9 @@ self.addEventListener('fetch', (event) => {
         { type: 'jamo', key: 'ㅑ', span: 5 },
         { type: 'jamo', key: 'ㅐ', span: 5 },
         { type: 'jamo', key: 'ㅔ', span: 5 },
-        { type: 'spacer', span: 8 }
+        { type: 'spacer', span: 18 }
       ],
-      // 2열 (좌측 3칸 여백 후 ㅁ ㄴ ㅇ ㄹ ㅎ ㅗ ㅓ ㅏ ㅣ 9개 키 × 5칸 = 45칸 + 우측 엔터 11칸 = 총 59칸)
+      // 2열 (좌측 3칸 여백 + ㅁ ㄴ ㅇ ㄹ ㅎ ㅗ ㅓ ㅏ ㅣ 9개 키 × 5칸 = 45칸 + ㅣ와 엔터 사이 2키 분량(10칸) 여백 + 엔터 11칸 = 총 69칸)
       [
         { type: 'spacer', span: 3 },
         { type: 'jamo', key: 'ㅁ', span: 5 },
@@ -2041,9 +2040,10 @@ self.addEventListener('fetch', (event) => {
         { type: 'jamo', key: 'ㅓ', span: 5 },
         { type: 'jamo', key: 'ㅏ', span: 5 },
         { type: 'jamo', key: 'ㅣ', span: 5 },
+        { type: 'spacer', span: 10 },
         { type: 'enter', label: '엔터', span: 11 }
       ],
-      // 3열 (좌측 쉬프트 6칸으로 줄여 ㅋ(7~11열)이 ㅁ(4~8열)과 ㄴ(9~13열) 정중앙 사이에 오도록 배치 + ㅡ 뒤 5칸 여백 + 우측 쉬프트 13칸 = 총 59칸)
+      // 3열 (좌측 쉬프트 6칸 + ㅋ ㅌ ㅊ ㅍ ㅠ ㅜ ㅡ 7개 키 × 5칸 = 35칸 + ㅡ 뒤 3키 분량(15칸) 여백 + 우측 쉬프트 13칸 = 총 69칸)
       [
         { type: 'shift', label: '쉬프트', span: 6 },
         { type: 'jamo', key: 'ㅋ', span: 5 },
@@ -2053,7 +2053,7 @@ self.addEventListener('fetch', (event) => {
         { type: 'jamo', key: 'ㅠ', span: 5 },
         { type: 'jamo', key: 'ㅜ', span: 5 },
         { type: 'jamo', key: 'ㅡ', span: 5 },
-        { type: 'spacer', span: 5 },
+        { type: 'spacer', span: 15 },
         { type: 'shift', label: '쉬프트', span: 13 }
       ]
     ];
@@ -2235,10 +2235,8 @@ self.addEventListener('fetch', (event) => {
         prosodyBoost: true
       },
 
-      // 키보드 Shift 상태 (누르고 있기 & 원터치 토글 모두 지원)
+      // 키보드 Shift 상태 (실제 키보드처럼 누르고 있는 동안에만 활성화)
       shiftHeld: false,
-      shiftSticky: false,
-      shiftUsedWhileHeld: false,
 
       // 모드 1: 타이핑(기본) - 단일 자음·모음·쌍자음·이중모음 완성 후 엔터
       typingbasic: {
@@ -3247,8 +3245,9 @@ self.addEventListener('fetch', (event) => {
       playSoundEffect('tap');
       stopListenAutoRepeat();
       state.mode = newMode;
+      activeShiftPointers.clear();
+      physicalShiftDown = false;
       state.shiftHeld = false;
-      state.shiftSticky = false;
 
       const tabs = {
         typingbasic: {
@@ -3344,17 +3343,82 @@ self.addEventListener('fetch', (event) => {
     /* ==========================================================================
        7. 모드 1: [타이핑(기본)] & 모드 2: [타이핑(심화)] + 리얼 두벌식 키보드(Shift/Enter)
        ========================================================================== */
+    const activeShiftPointers = new Set();
+    let physicalShiftDown = false;
+
     function isShiftActive() {
-      return state.shiftHeld || state.shiftSticky;
+      return state.shiftHeld || activeShiftPointers.size > 0 || physicalShiftDown;
     }
+
+    // 쉬프트 키를 누르거나 뗄 때 DOM을 재생성하지 않고 즉시 키캡 글자와 스타일만 갱신 (멀티터치 유지 보장)
+    function syncShiftKeycapsInPlace() {
+      const shiftOn = isShiftActive();
+      const containerId = state.mode === 'typingbasic' ? 'keypad-keyboard-basic' : 'keypad-keyboard';
+      const kbContainer = document.getElementById(containerId);
+      if (!kbContainer) return;
+
+      kbContainer.querySelectorAll('[data-role="shift-btn"]').forEach((btn) => {
+        if (shiftOn) {
+          btn.classList.add('keycap-shift-active');
+        } else {
+          btn.classList.remove('keycap-shift-active');
+        }
+      });
+
+      const statusText = kbContainer.querySelector('[data-role="shift-status-text"]');
+      if (statusText) {
+        statusText.textContent = shiftOn
+          ? '⚡ 쉬프트 누르는 중 (ㅃㅉㄸㄲㅆㅒㅖ)'
+          : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누른 채로 입력하세요';
+      }
+
+      kbContainer.querySelectorAll('[data-base-jamo]').forEach((btn) => {
+        const baseKey = btn.dataset.baseJamo;
+        const displayKey = shiftOn && SHIFT_KEY_MAP[baseKey] ? SHIFT_KEY_MAP[baseKey] : baseKey;
+        btn.dataset.jamo = displayKey;
+        const labelSpan = btn.querySelector('span');
+        if (labelSpan) labelSpan.textContent = displayKey;
+      });
+    }
+
+    function releaseShiftPointer(pointerId) {
+      if (pointerId !== undefined && activeShiftPointers.has(pointerId)) {
+        activeShiftPointers.delete(pointerId);
+      }
+      const nextShift = activeShiftPointers.size > 0 || physicalShiftDown;
+      if (state.shiftHeld !== nextShift) {
+        state.shiftHeld = nextShift;
+        syncShiftKeycapsInPlace();
+      }
+    }
+
+    window.addEventListener('pointerup', (e) => releaseShiftPointer(e.pointerId));
+    window.addEventListener('pointercancel', (e) => releaseShiftPointer(e.pointerId));
+    window.addEventListener('touchend', (e) => {
+      if (!e.touches || e.touches.length === 0) {
+        activeShiftPointers.clear();
+        if (!physicalShiftDown && state.shiftHeld) {
+          state.shiftHeld = false;
+          syncShiftKeycapsInPlace();
+        }
+      }
+    });
+    window.addEventListener('blur', () => {
+      activeShiftPointers.clear();
+      physicalShiftDown = false;
+      if (state.shiftHeld) {
+        state.shiftHeld = false;
+        syncShiftKeycapsInPlace();
+      }
+    });
 
     // ----- 모드 1: 타이핑(기본) (단일 자음·모음·쌍자음·이중모음 완성) -----
     function setupTypingBasicQuestion() {
       state.typingbasic.currentStrokes = [];
       state.typingbasic.readyToSubmit = false;
       state.typingbasic.completed = false;
-      state.shiftHeld = false;
-      state.shiftSticky = false;
+      activeShiftPointers.clear();
+      state.shiftHeld = physicalShiftDown;
       renderTypingBasicView();
     }
 
@@ -3546,8 +3610,8 @@ self.addEventListener('fetch', (event) => {
       }
       state.word.readyToSubmit = false;
       state.word.completed = false;
-      state.shiftHeld = false;
-      state.shiftSticky = false;
+      activeShiftPointers.clear();
+      state.shiftHeld = physicalShiftDown;
       renderWordView();
     }
 
@@ -3658,11 +3722,15 @@ self.addEventListener('fetch', (event) => {
           if (item.type === 'status') {
             const statusEl = document.createElement('div');
             statusEl.style.gridColumn = `span ${item.span} / span ${item.span}`;
-            statusEl.className = 'flex items-center gap-2 px-2 text-xs text-slate-700 select-none';
+            statusEl.className = 'flex items-center justify-between px-2 py-0.5 text-xs text-slate-700 select-none';
             statusEl.innerHTML = `
-              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 border border-white"></span>자음(파랑)</span>
-              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-white"></span>모음(노랑)</span>
-              <span class="inline text-purple-700 font-bold">${shiftOn ? '⚡ 쉬프트 켜짐 (ㅃㅉㄸㄲㅆㅒㅖ)' : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누르세요'}</span>
+              <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 border border-white"></span>자음(파랑)</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-white"></span>모음(노랑)</span>
+              </div>
+              <span data-role="shift-status-text" class="text-purple-700 font-bold">${
+                shiftOn ? '⚡ 쉬프트 누르는 중 (ㅃㅉㄸㄲㅆㅒㅖ)' : '💡 쌍자음·ㅒ·ㅖ는 [⇧ 쉬프트]를 누른 채로 입력하세요'
+              }</span>
             `;
             rowEl.appendChild(statusEl);
             return;
@@ -3672,54 +3740,58 @@ self.addEventListener('fetch', (event) => {
           btn.type = 'button';
           btn.style.gridColumn = `span ${item.span} / span ${item.span}`;
 
-          if (item.type === 'backspace') {
-            btn.className = 'keycap-base keycap-action py-2 flex items-center justify-center gap-1 text-sm font-bold';
-            btn.innerHTML = `<span class="relative z-10 text-base">⌫</span><span class="relative z-10">${item.label}</span>`;
-            btn.onclick = () => handleKeypadBackspace();
-          } else if (item.type === 'enter') {
+          if (item.type === 'enter') {
             btn.className = `keycap-base keycap-enter ${enterReady ? 'keycap-enter-ready' : ''} py-2.5 flex items-center justify-center gap-1 text-sm font-bold`;
             btn.innerHTML = `<span class="relative z-10 text-base">⏎</span><span class="relative z-10">${item.label}</span>`;
             btn.onclick = () => handleKeypadEnter(btn);
           } else if (item.type === 'shift') {
+            btn.dataset.role = 'shift-btn';
             btn.className = `keycap-base keycap-shift ${shiftOn ? 'keycap-shift-active' : ''} py-2.5 flex items-center justify-center gap-1 text-sm font-bold`;
             btn.innerHTML = `<span class="relative z-10 text-base">⇧</span><span class="relative z-10">${item.label}</span>`;
 
-            // 멀티터치 홀드(누른 채로 입력) 및 원터치 토글 모두 지원
+            // 실제 키보드처럼 누르고 있는 동안에만 쉬프트 활성화 (떼면 즉시 해제)
             btn.addEventListener('pointerdown', (e) => {
               e.preventDefault();
+              try {
+                btn.setPointerCapture(e.pointerId);
+              } catch (err) {}
               playSoundEffect('tap');
-              if (state.shiftSticky && !state.shiftHeld) {
-                state.shiftSticky = false;
-                state.shiftHeld = false;
-                state.shiftUsedWhileHeld = true;
-              } else {
-                state.shiftHeld = true;
-                state.shiftUsedWhileHeld = false;
-              }
-              renderHangulKeypad();
+              activeShiftPointers.add(e.pointerId);
+              state.shiftHeld = true;
+              syncShiftKeycapsInPlace();
             });
-
-            const releaseShift = (e) => {
+            btn.addEventListener('pointerup', (e) => {
               e.preventDefault();
-              if (state.shiftHeld) {
-                state.shiftHeld = false;
-                if (!state.shiftUsedWhileHeld) {
-                  // 다른 키를 누르지 않고 쉬프트만 톡 눌렀다 뗀 경우 다음 1글자 입력까지 쉬프트 유지
-                  state.shiftSticky = true;
-                }
-                renderHangulKeypad();
-              }
-            };
-            btn.addEventListener('pointerup', releaseShift);
-            btn.addEventListener('pointercancel', releaseShift);
+              releaseShiftPointer(e.pointerId);
+            });
+            btn.addEventListener('pointercancel', (e) => {
+              releaseShiftPointer(e.pointerId);
+            });
+            btn.addEventListener('lostpointercapture', (e) => {
+              releaseShiftPointer(e.pointerId);
+            });
           } else {
             const displayKey = shiftOn && SHIFT_KEY_MAP[item.key] ? SHIFT_KEY_MAP[item.key] : item.key;
             const isConsonant = KEYPAD_CONSONANTS.includes(displayKey);
+            btn.dataset.baseJamo = item.key;
             btn.dataset.jamo = displayKey;
             btn.className = `keycap-base ${isConsonant ? 'keycap-consonant' : 'keycap-vowel'} keycap-text py-2.5 flex items-center justify-center font-bold`;
             btn.innerHTML = `<span class="relative z-10">${displayKey}</span>`;
-            // 모바일·태블릿 브라우저가 사용자 클릭 제스처로 명확히 인식하여 TTS를 즉시 허용하도록 onclick 사용
-            btn.onclick = () => handleKeypadInput(displayKey, btn);
+
+            // 한 손가락으로 쉬프트를 누른 채 다른 손가락으로 글쇠를 터치하는 멀티터치 상황과 일반 클릭을 모두 지원
+            btn.addEventListener('pointerdown', () => {
+              if (isShiftActive()) {
+                btn._triggeredOnMultiTouch = Date.now();
+                handleKeypadInput(btn.dataset.jamo || displayKey, btn);
+              }
+            });
+            btn.onclick = () => {
+              if (btn._triggeredOnMultiTouch && Date.now() - btn._triggeredOnMultiTouch < 400) {
+                btn._triggeredOnMultiTouch = 0;
+                return;
+              }
+              handleKeypadInput(btn.dataset.jamo || displayKey, btn);
+            };
           }
 
           rowEl.appendChild(btn);
@@ -3730,12 +3802,8 @@ self.addEventListener('fetch', (event) => {
     }
 
     function consumeShiftAfterStroke() {
-      if (state.shiftHeld) {
-        state.shiftUsedWhileHeld = true;
-      }
-      if (state.shiftSticky) {
-        state.shiftSticky = false;
-      }
+      // 실제 키보드처럼 물리 키나 터치로 쉬프트를 계속 누르고 있으면 유지되고, 손을 떼면 해제됨
+      state.shiftHeld = activeShiftPointers.size > 0 || physicalShiftDown;
     }
 
     function handleKeypadInput(jamo, btnEl) {
@@ -3974,10 +4042,10 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (e.key === 'Shift') {
+        physicalShiftDown = true;
         if (!state.shiftHeld) {
           state.shiftHeld = true;
-          state.shiftUsedWhileHeld = false;
-          renderHangulKeypad();
+          syncShiftKeycapsInPlace();
         }
         return;
       }
@@ -3985,12 +4053,6 @@ self.addEventListener('fetch', (event) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleKeypadEnter(null);
-        return;
-      }
-
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        handleKeypadBackspace();
         return;
       }
 
@@ -4020,9 +4082,10 @@ self.addEventListener('fetch', (event) => {
     });
 
     window.addEventListener('keyup', (e) => {
-      if (e.key === 'Shift' && state.shiftHeld) {
-        state.shiftHeld = false;
-        renderHangulKeypad();
+      if (e.key === 'Shift') {
+        physicalShiftDown = false;
+        state.shiftHeld = activeShiftPointers.size > 0;
+        syncShiftKeycapsInPlace();
       }
     });
 
